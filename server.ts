@@ -50,10 +50,10 @@ export function serve<T extends object>(
         let fnName: string;
 
         if (def.originalName) {
-            originalFn = ins[def.originalName] as any;
+            originalFn = (ins[def.originalName] as Function)?.bind(ins) as any;
             fnName = def.originalName;
         } else {
-            originalFn = ins[name] as any;
+            originalFn = (ins[name] as Function)?.bind(ins) as any;
             fnName = name;
         }
 

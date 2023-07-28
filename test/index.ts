@@ -5,14 +5,14 @@ import {
     credentials,
     loadPackageDefinition
 } from "@grpc/grpc-js";
-import * as protoLoader from '@grpc/proto-loader';
+import * as protoLoader from "@grpc/proto-loader";
 import { deepStrictEqual } from "assert";
 import { execSync } from "child_process";
 import { type ChildProcess, spawn } from "child_process";
 import { unlinkSync } from "fs";
 import { after, before, describe, it } from "mocha";
 
-const PROTO_PATH = __dirname + '/helloworld.proto';
+const PROTO_PATH = __dirname + "/helloworld.proto";
 const addr = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -41,7 +41,7 @@ interface Greeter {
 
 const greeterImpl: Greeter = {
     async sayHello({ name }) {
-        return { message: 'Hello ' + name } as Response;
+        return { message: "Hello, " + name } as Response;
     },
     async *sayHelloStreamReply({ name }) {
         yield { message: `Hello 1: ${name}` } as Response;
@@ -66,7 +66,7 @@ const greeterImpl: Greeter = {
 
 class GreeterService implements Greeter {
     async sayHello({ name }: Request) {
-        return { message: 'Hello ' + name } as Response;
+        return { message: "Hello, " + name } as Response;
     }
 
     async *sayHelloStreamReply({ name }: Request) {
@@ -82,12 +82,12 @@ class GreeterService implements Greeter {
             names.push(name);
         }
 
-        return { message: "Hello, " + names.join(", ") } as Response;
+        return await this.sayHello({ name: names.join(", ") });
     }
 
     async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
         for await (const { name } of stream) {
-            yield { message: "Hello, " + name } as Response;
+            yield await this.sayHello({ name });
         }
     }
 }
@@ -119,7 +119,7 @@ describe("node-server <=> node-client", () => {
     it("should call the async function as expected", async () => {
         const result = await client.sayHello({ name: "World" });
 
-        deepStrictEqual(result, { message: "Hello World" });
+        deepStrictEqual(result, { message: "Hello, World" });
     });
 
     it("should call the async generator function as expected", async () => {
@@ -176,8 +176,8 @@ describe("go-server <=> node-client", () => {
 
     before((done) => {
         // Must build the go program before running it, otherwise the
-        // server.kill() won't be able to release the port, since
-        // the server process isn't the real process the start the gRPC server
+        // server.kill() won"t be able to release the port, since
+        // the server process isn"t the real process the start the gRPC server
         // and when the go process is killed, the real process the holds the port
         // still hangs and hangs the Node.js process as well, reason is unknown.
         execSync("go build main.go", { cwd: __dirname + "/go" });
@@ -189,7 +189,7 @@ describe("go-server <=> node-client", () => {
             done();
         }).on("error", (err) => {
             done(err);
-        }).on('exit', () => {
+        }).on("exit", () => {
             unlinkSync(__dirname + "/go/main");
         });
     });
@@ -202,7 +202,7 @@ describe("go-server <=> node-client", () => {
     it("should call the async function as expected", async function () {
         this.timeout(5000);
         const result = await client.sayHello({ name: "World" });
-        deepStrictEqual(result, { message: "Hello World" });
+        deepStrictEqual(result, { message: "Hello, World" });
     });
 
     it("should call the async generator function as expected", async () => {
@@ -247,7 +247,7 @@ describe("service class", () => {
     it("should call the async function as expected", async () => {
         const result = await client.sayHello({ name: "World" });
 
-        deepStrictEqual(result, { message: "Hello World" });
+        deepStrictEqual(result, { message: "Hello, World" });
     });
 
     it("should call the async generator function as expected", async () => {

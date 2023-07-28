@@ -408,12 +408,12 @@ class GreeterService implements Greeter { // or just class Greeter {}
             names.push(name);
         }
 
-        return { message: "Hello, " + names.join(", ") } as Response;
+        return await this.sayHello({ name: names.join(", ") });
     }
 
     async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
-        for await (const { name } of stream) {
-            yield { message: "Hello, " + name } as Response;
+        for await (const req of stream) {
+            yield await this.sayHello(req);
         }
     }
 }
@@ -429,7 +429,7 @@ serve<Greeter>(helloworld.Greeter, GreeterService, server);
 
 A class instance holds its own internal state, for example, we can store some
 data in a property and use it whenever we need it. And we can use `this` keyword
-to access other methods inside the class.
+to access other methods inside the class (as the above example demonstrates).
 
 However, if we're going to use the class, make sure the following rules are
 honored:

@@ -14,7 +14,7 @@ type Greeter struct {
 }
 
 func (g *Greeter) SayHello(ctx context.Context, req *helloworld.HelloRequest) (*helloworld.HelloReply, error) {
-	return &helloworld.HelloReply{Message: "Hello " + req.Name}, nil
+	return &helloworld.HelloReply{Message: "Hello, " + req.Name}, nil
 }
 
 func (g *Greeter) SayHelloStreamReply(req *helloworld.HelloRequest, stream helloworld.Greeter_SayHelloStreamReplyServer) error {
