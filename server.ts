@@ -24,11 +24,18 @@ export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) =>
 
 export function serve<T extends object>(
     service: ServiceClientConstructor | ServiceDefinition<T>,
-    impl: T,
+    impl: T | (new () => T),
     server: Server
 ) {
     const implementations: { [name: string]: (data?: any) => any; } = {};
     let _service: ServiceDefinition<any>;
+    let ins: any;
+
+    if (typeof impl === "function") {
+        ins = new impl();
+    } else {
+        ins = impl;
+    }
 
     if (service instanceof Function && service.service && service.serviceName) {
         _service = service.service;
@@ -43,10 +50,10 @@ export function serve<T extends object>(
         let fnName: string;
 
         if (def.originalName) {
-            originalFn = (impl as any)[def.originalName] as any;
+            originalFn = ins[def.originalName] as any;
             fnName = def.originalName;
         } else {
-            originalFn = (impl as any)[name] as any;
+            originalFn = ins[name] as any;
             fnName = name;
         }
 

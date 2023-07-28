@@ -12,9 +12,11 @@ async/await functionality into both the gRPC server and the client.
 
 ## Prerequisites
 
-- `Node.js` v14+
-- For server-side code, if using TypeScript, make sure the compiling target is
-    `es2018` or above which outputs native async generator functions.
+- [Node.js](https://nodejs.org) v14+
+- [@grpc/grpc-js](https://www.npmjs.com/package/@grpc/grpc-js)
+- For server-side code, if using [TypeScript](https://www.typescriptlang.org/),
+    make sure the compiling target is `es2018` or higher which outputs native
+    async generator functions.
 
 ## Examples
 
@@ -334,7 +336,7 @@ Anyway, I'll list them all as follows:
 ```ts
 export function serve<T>(
     service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>,
-    impl: T,
+    impl: T | (new () => T),
     server: grpc.Server
 ): grpc.Server;
 
@@ -376,3 +378,62 @@ export type ServiceClient<T extends object> = Omit<grpc.Client, "waitForReady"> 
     waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
 } & WrapMethods<T>;
 ```
+
+## Use Service Class
+
+Some people (me, in particular) may prefer a service class instead of an object
+literal as the implementation of the gRPC functions. It could be done by passing
+the class constructor to the `serve()` function, as the function signature shown
+above. For instance, the `Greeter` example used in this article, we can define
+its implementation in a `class`ic way.
+
+```ts
+// ...
+
+class GreeterService implements Greeter { // or just class Greeter {}
+    async sayHello({ name }: Request) {
+        return { message: 'Hello ' + name } as Response;
+    }
+
+    async *sayHelloStreamReply({ name }: Request) {
+        yield { message: `Hello 1: ${name}` } as Response;
+        yield { message: `Hello 2: ${name}` } as Response;
+        yield { message: `Hello 3: ${name}` } as Response;
+    }
+
+    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
+        const names: string[] = [];
+
+        for await (const { name } of stream) {
+            names.push(name);
+        }
+
+        return { message: "Hello, " + names.join(", ") } as Response;
+    }
+
+    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+        for await (const { name } of stream) {
+            yield { message: "Hello, " + name } as Response;
+        }
+    }
+}
+
+// ==== server ====
+
+server = new Server();
+// @ts-ignorea
+serve<Greeter>(helloworld.Greeter, GreeterService, server);
+
+// ...
+```
+
+A class instance holds its own internal state, for example, we can store some
+data in a property and use it whenever we need it. And we can use `this` keyword
+to access other methods inside the class.
+
+However, if we're going to use the class, make sure the following rules are
+honored:
+
+- The constructor of the class takes no arguments (`0-arguments` design).
+- Only the RPC functions are modified public (they're the only ones accessible
+    outside the class scope).

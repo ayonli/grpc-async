@@ -64,6 +64,34 @@ const greeterImpl: Greeter = {
     }
 };
 
+class GreeterService implements Greeter {
+    async sayHello({ name }: Request) {
+        return { message: 'Hello ' + name } as Response;
+    }
+
+    async *sayHelloStreamReply({ name }: Request) {
+        yield { message: `Hello 1: ${name}` } as Response;
+        yield { message: `Hello 2: ${name}` } as Response;
+        yield { message: `Hello 3: ${name}` } as Response;
+    }
+
+    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
+        const names: string[] = [];
+
+        for await (const { name } of stream) {
+            names.push(name);
+        }
+
+        return { message: "Hello, " + names.join(", ") } as Response;
+    }
+
+    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+        for await (const { name } of stream) {
+            yield { message: "Hello, " + name } as Response;
+        }
+    }
+}
+
 describe("node-server <=> node-client", () => {
     let server: Server;
     let client: ServiceClient<Greeter>;
@@ -188,6 +216,84 @@ describe("go-server <=> node-client", () => {
             { message: "Hello 1: World" },
             { message: "Hello 2: World" },
             { message: "Hello 3: World" }
+        ]);
+    });
+});
+
+describe("service class", () => {
+    let server: Server;
+    let client: ServiceClient<Greeter>;
+
+    before((done) => {
+        server = new Server();
+
+        // @ts-ignore
+        serve(helloworld.Greeter, GreeterService, server);
+
+        server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
+            server.start();
+            done();
+        });
+
+        // @ts-ignore
+        client = connect(helloworld.Greeter, addr, credentials.createInsecure());
+    });
+
+    after(() => {
+        client.close();
+        server.forceShutdown();
+    });
+
+    it("should call the async function as expected", async () => {
+        const result = await client.sayHello({ name: "World" });
+
+        deepStrictEqual(result, { message: "Hello World" });
+    });
+
+    it("should call the async generator function as expected", async () => {
+        const results: Response[] = [];
+
+        for await (const result of client.sayHelloStreamReply({ name: "World" })) {
+            results.push(result);
+        }
+
+        deepStrictEqual(results, [
+            { message: "Hello 1: World" },
+            { message: "Hello 2: World" },
+            { message: "Hello 3: World" }
+        ]);
+    });
+
+    it("should make stream requests as expected", async () => {
+        const call = client.sayHelloStreamRequest();
+
+        call.write({ name: "Mr. World" });
+        call.write({ name: "Mrs. World" });
+
+        const result = await call.returns();
+
+        deepStrictEqual(result, { message: "Hello, Mr. World, Mrs. World" });
+    });
+
+    it("should make stream requests and receive stream responses as expected", async () => {
+        const call = client.sayHelloDuplex();
+
+        call.write({ name: "Mr. World" });
+        call.write({ name: "Mrs. World" });
+
+        const results: Response[] = [];
+
+        for await (const reply of call) {
+            results.push(reply);
+
+            if (results.length === 2) {
+                call.end();
+            }
+        }
+
+        deepStrictEqual(results, [
+            { message: "Hello, Mr. World" },
+            { message: "Hello, Mrs. World" }
         ]);
     });
 });
