@@ -1,4 +1,4 @@
-import { serve, connect, ServiceClient, ServerReadableStream, ServerDuplexStream } from "../index";
+import { serve, connect, ServiceClient, ServerReadableStream, ServerDuplexStream, unserve } from "../index";
 import {
     Server,
     ServerCredentials,
@@ -241,11 +241,6 @@ describe("service class", () => {
         client = connect(helloworld.Greeter, addr, credentials.createInsecure());
     });
 
-    after(() => {
-        client.close();
-        server.forceShutdown();
-    });
-
     it("should call the async function as expected", async () => {
         const result = await client.sayHello({ name: "World" });
 
@@ -297,5 +292,31 @@ describe("service class", () => {
             { message: "Hello, Mr. World" },
             { message: "Hello, Mrs. World" }
         ]);
+    });
+
+    describe("reload service", () => {
+        class NewGreeterService extends GreeterService {
+            async sayHello({ name }: Request): Promise<Response> {
+                return { message: "Hi, " + name };
+            }
+        }
+
+        before(() => {
+            // @ts-ignore
+            unserve(helloworld.Greeter, server);
+            // @ts-ignore
+            serve(helloworld.Greeter, NewGreeterService, server);
+        });
+
+        after(() => {
+            client.close();
+            server.forceShutdown();
+        });
+
+        it("should call the async function as expected", async () => {
+            const result = await client.sayHello({ name: "World" });
+
+            deepStrictEqual(result, { message: "Hi, World" });
+        });
     });
 });

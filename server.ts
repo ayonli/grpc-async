@@ -102,5 +102,19 @@ export function serve<T extends object>(
 
     // @ts-ignore
     server.addService(_service, implementations);
-    return server;
+}
+
+export function unserve<T extends object>(
+    service: ServiceClientConstructor | ServiceDefinition<T>,
+    server: Server
+) {
+    let _service: ServiceDefinition<any>;
+
+    if (service instanceof Function && service.service && service.serviceName) {
+        _service = service.service;
+    } else {
+        _service = service as ServiceDefinition<T>;
+    }
+
+    server.removeService(_service);
 }

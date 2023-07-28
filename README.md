@@ -338,7 +338,12 @@ export function serve<T>(
     service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>,
     impl: T | (new () => T),
     server: grpc.Server
-): grpc.Server;
+): void;
+
+export function unserve<T>(
+    service: grpc.ServiceClientConstructor | ServiceDefinition<T>,
+    server: grpc.Server
+): void;
 
 export function connect<T>(
     serviceCtor: grpc.ServiceClientConstructor,
@@ -419,7 +424,6 @@ class GreeterService implements Greeter { // or just class Greeter {}
 }
 
 // ==== server ====
-
 server = new Server();
 // @ts-ignorea
 serve<Greeter>(helloworld.Greeter, GreeterService, server);
