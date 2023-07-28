@@ -9,6 +9,8 @@ import type {
 } from "@grpc/grpc-js";
 import { DuplexFunction, StreamRequestFunction } from "./server";
 
+const NodeVersion = parseInt(process.version.slice(1));
+
 export type ClientWritableStream<Req, Res> = gClientWritableStream<Req> & {
     returns(): Promise<Res>;
 };
@@ -86,6 +88,22 @@ export function connect<T extends object>(
                             }
                         }
                     };
+
+                    if (NodeVersion < 18) {
+                        // Prior to Node.js v18, `stream.end()` does't release the
+                        // connection and causing the `for await` loop to hang,
+                        // so we overwrite it with `stream.destroy()` at the bottom.
+                        const _end = call.end;
+                        // @ts-ignore
+                        call.end = (...args: any[]) => {
+                            // @ts-ignore
+                            _end.apply(call, args);
+
+                            setImmediate(() => {
+                                call.destroy();
+                            });
+                        };
+                    }
 
                     return call;
                 };
