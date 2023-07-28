@@ -174,12 +174,13 @@ describe("go-server <=> node-client", () => {
     let server: ChildProcess;
     let client: ServiceClient<Greeter>;
 
-    before((done) => {
+    before(function (done) {
         // Must build the go program before running it, otherwise the
         // server.kill() won"t be able to release the port, since
         // the server process isn"t the real process the start the gRPC server
         // and when the go process is killed, the real process the holds the port
         // still hangs and hangs the Node.js process as well, reason is unknown.
+        this.timeout(120_000); // this could take a while for go installing dependencies
         execSync("go build main.go", { cwd: __dirname + "/go" });
         server = spawn("./main", { cwd: __dirname + "/go" });
 
@@ -205,7 +206,8 @@ describe("go-server <=> node-client", () => {
         deepStrictEqual(result, { message: "Hello, World" });
     });
 
-    it("should call the async generator function as expected", async () => {
+    it("should call the async generator function as expected", async function () {
+        this.timeout(5000);
         const results: Response[] = [];
 
         for await (const result of client.sayHelloStreamReply({ name: "World" })) {
