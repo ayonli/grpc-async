@@ -1,0 +1,38 @@
+{
+  "name": "@hyurl/grpc-async",
+  "version": "1.0.0",
+  "description": "A gRPC wrapper for Node.js with async functions",
+  "main": "index.js",
+  "scripts": {
+    "prepublishOnly": "tsc --module commonjs --target es2018 --sourceMap true --declaration true index.ts",
+    "postpublish": "ls *.js | xargs rm -f && ls *.js.map | xargs rm -f && ls *.d.ts | xargs rm -f",
+    "test": "mocha -r ts-node/register test/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hyurl/grpc-async.git"
+  },
+  "keywords": [
+    "gRPC",
+    "async"
+  ],
+  "author": "A-yon Lee <the@ayon.li>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hyurl/grpc-async/issues"
+  },
+  "homepage": "https://github.com/hyurl/grpc-async#readme",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.8.20"
+  },
+  "devDependencies": {
+    "@grpc/proto-loader": "^0.7.8",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^20.4.5",
+    "mocha": "^10.2.0",
+    "ts-node": "^10.9.1"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
