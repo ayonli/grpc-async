@@ -248,20 +248,26 @@ const client = connect<Greeter>(helloworld.Greeter, addr, credentials.createInse
 (async () => {
     const reply = await client.sayHello({ name: "World" });
     console.log(reply); // { message: "Hello, World" }
+})().catch(console.error);
 
+(async () => {
     for await (const reply of client.sayHelloStreamReply({ name: "World" })) {
         console.log(reply);
         // { message: "Hello 1: World" }
         // { message: "Hello 2: World" }
         // { message: "Hello 3: World" }
     }
+})().catch(console.error);
 
+(async () => {
     const streamRequestCall = client.sayHelloStreamRequest();
     streamRequestCall.write({ name: "Mr. World" });
     streamRequestCall.write({ name: "Mrs. World" });
     const reply1 = await streamRequestCall.returns();
     console.log(reply1); // { message: "Hello, Mr. World, Mrs. World" }
+})().catch(console.error);
 
+(async () => {
     const duplexCall = client.sayHelloDuplex();
     let counter = 0;
     duplexCall.write({ name: "Mr. World" });
@@ -276,9 +282,7 @@ const client = connect<Greeter>(helloworld.Greeter, addr, credentials.createInse
             duplexCall.end(); // this will cause the iterator to close
         }
     }
-})().catch(err => {
-    console.error(err);
-});
+})().catch(console.error);
 // ==== client ====
 ```
 
@@ -339,7 +343,7 @@ typing system and reduce errors in our code.
 There are only two major functions in this package and we have gone through them
 in the above examples. However, for better TypeScript support, this package also
 rewrites some of the interfaces/types seen in the **@grpc/grpc-js** library.
-Anyway, I'll list them all as follows:
+Anyway, I'll list them as follows:
 
 ```ts
 export function serve<T>(
@@ -390,6 +394,12 @@ export type ServiceClient<T extends object> = Omit<grpc.Client, "waitForReady"> 
     waitForReady(deadline?: Date | number): Promise<void>;
     waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
 } & WrapMethods<T>;
+
+export interface ServiceClientConstructor<T extends object> {
+    new(address: string, credentials: gprc.ChannelCredentials, options?: Partial<gprc.ChannelOptions>): ServiceClient<T>;
+    service: grpc.ServiceDefinition;
+    serviceName: string;
+}
 ```
 
 ## Use Service Class
@@ -449,3 +459,153 @@ honored:
 - The constructor of the class takes no arguments (`0-arguments` design).
 - Only the RPC functions are modified public (they're the only ones accessible
     outside the class scope).
+
+## Use Connector and ConnectionManager
+
+Other than using `connect()` to connect to a certain server, we can use
+`new Connector()` to connect to multiple servers at once and leverage calls with
+a programmatic load balancer.
+
+Unlike the traditional load balancer which uses a
+DNS resolver that assumes our program runs on different machines, this new load
+balancer allows us to run the server in the same machine but in many
+process/instances. And we can programmatically control how our traffic is routed
+to different servers on demand.
+
+```ts
+import { Connector } from "."; // replace this with `@hyurl/grpc-async` in your code
+// ...
+
+// imagine we have three server instances run on the same server (localhost).
+const connector = new Connector({
+    package: "helloworld", // same package name in the .proto file
+    // @ts-ignore
+    service: helloworld.Greeter,
+}, [
+    { address: "localhost:50051", credentials: credentials.createInsecure() },
+    { address: "localhost:50052", credentials: credentials.createInsecure() },
+    { address: "localhost:50053", credentials: credentials.createInsecure() }
+]);
+
+(async () => {
+    // Be default, the connector uses round-robin algorithm for routing, so
+    // this call happens on the first server instance,
+    const reply1 = await connector.getInstance().sayHello({ name: "World" });
+
+    // this call happens on the second server instance.
+    const reply2 = await connector.getInstance().sayHello({ name: "World" });
+
+    // this call happens on the third server instance.
+    const reply3 = await connector.getInstance().sayHello({ name: "World" });
+
+    // this call happens on the first server instance.
+    const reply4 = await connector.getInstance().sayHello({ name: "World" });
+})();
+
+// We can define the route resolver to achieve custom load balancing strategy.
+import hash from "string-hash"; // assuming this package exists
+const connector2 = new Connector({
+    package: "helloworld", // same package name in the .proto file
+    // @ts-ignore
+    service: helloworld.Greeter,
+}, [
+    { address: "localhost:50051", credentials: credentials.createInsecure() },
+    { address: "localhost:50052", credentials: credentials.createInsecure() },
+    { address: "localhost:50053", credentials: credentials.createInsecure() }
+], (ctx) => {
+    const addresses: string[] = ctx.servers.map(item => item.address);
+
+    if (typeof ctx.params === "string") {
+        if (addresses.includes(ctx.params)) {
+            return ctx.params; // explicitly use a server instance
+        } else {
+            // route by hash
+            const id: number = hash(ctx.params);
+            return addresses[id % addresses.length];
+        }
+    } else if (typeof ctx.params === "number") {
+        return addresses[ctx.params % addresses.length];
+    } else if (typeof ctx.params === "object") {
+        // This algorithm guarantees the same param structure passed to the
+        // `getInstance()` returns the same service instance.
+        const id: number = hash(Object.keys(ctx.params ?? {}).sort());
+        return addresses[id % addresses.length];
+    } else {
+        // use round-robin
+        return addresses[ctx.acc % addresses.length];
+    }
+});
+
+(async () => {
+    // These two calls will happen on the same server instance since they have
+    // the same route param structure:
+    const req1: Request = { name: "Mr. World" };
+    const reply1 = await connector2.getInstance(req).sayHello(req);
+
+    const req2: Request = { name: "Mrs. World" };
+    const reply2 = await connector2.getInstance(req).sayHello(req);
+
+    // This call happens on the first server since we explicitly set the server
+    // address to use:
+    const req3: Request = { name: "Mrs. World" };
+    const reply3 = await connector2.getInstance("localhost:50051").sayHello(req);
+})();
+```
+
+### ConnectionManager
+
+ConnectionManager provides a place to manage all clients and retrieve instances
+via a general approach.
+
+```ts
+import { Connector, ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
+// ...
+
+// imagine we have three server instances run on the same server (localhost).
+const connector = new Connector({
+    package: "helloworld", // same package name in the .proto file
+    // @ts-ignore
+    service: helloworld.Greeter,
+}, [
+    { address: "localhost:50051", credentials: credentials.createInsecure() },
+    { address: "localhost:50052", credentials: credentials.createInsecure() },
+    { address: "localhost:50053", credentials: credentials.createInsecure() }
+]);
+
+const manager = new ConnectionManager();
+
+manager.register(connector);
+
+// Instead of calling `connector.getInstance()`, we do this:
+const ins = manager.getInstance<Greeter>("helloworld.Greeter");
+```
+
+A client or a connector always binds a specific service client constructor and is
+a scoped variable, if we are going to access them across our program in different
+places, it would very painful and may cause recursive import problem.
+
+The connection manager, however, is a central place and a single variable, we
+can assign it to the global namespace and use it to retrieve service instance
+anywhere we want without worrying how to import it.
+
+For example:
+
+```ts
+import { ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
+
+declare global {
+    const services: ConnectionManager;
+}
+
+// @ts-ignore
+global["services"] = new ConnectionManager();
+
+// and use it anywhere
+const ins = services.getInstance<Greeter>("helloworld.Greeter");
+```
+
+For more information about the `Connector` and the `ConnectionManager`, please
+refer to the source code of their definition. They are the enhancement part of
+this package that aims to provide straightforward usage of gRPC in a project
+with services system design, however, they're not the main purpose of this
+package, which is still to bring async support for gRPC in Node.js.
