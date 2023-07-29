@@ -220,6 +220,39 @@ describe("go-server <=> node-client", () => {
             { message: "Hello 3: World" }
         ]);
     });
+
+    it("should make stream requests as expected", async () => {
+        const call = client.sayHelloStreamRequest();
+
+        call.write({ name: "Mr. World" });
+        call.write({ name: "Mrs. World" });
+
+        const result = await call.returns();
+
+        deepStrictEqual(result, { message: "Hello, Mr. World, Mrs. World" });
+    });
+
+    it("should make stream requests and receive stream responses as expected", async () => {
+        const call = client.sayHelloDuplex();
+
+        call.write({ name: "Mr. World" });
+        call.write({ name: "Mrs. World" });
+
+        const results: Response[] = [];
+
+        for await (const reply of call) {
+            results.push(reply);
+
+            if (results.length === 2) {
+                call.end();
+            }
+        }
+
+        deepStrictEqual(results, [
+            { message: "Hello, Mr. World" },
+            { message: "Hello, Mrs. World" }
+        ]);
+    });
 });
 
 describe("service class", () => {
