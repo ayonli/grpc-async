@@ -156,7 +156,13 @@ export function connect<T extends object>(
             // @ts-ignore
             newFn = (data: any, callback?: (err: unknown, reply: any) => void) => {
                 if (callback) {
-                    return originalFn.call(ins, data, callback);
+                    waitForReady(void 0, (err) => {
+                        if (err) {
+                            callback(err, void 0);
+                        } else {
+                            originalFn.call(ins, data, callback);
+                        }
+                    });
                 } else {
                     return new Promise((resolve, reject) => {
                         Promise.resolve(waitForReady()).then(() => {
