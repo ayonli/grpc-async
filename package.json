@@ -23,10 +23,11 @@
     "url": "https://github.com/hyurl/grpc-async/issues"
   },
   "homepage": "https://github.com/hyurl/grpc-async#readme",
-  "dependencies": {
-    "@grpc/grpc-js": "^1.8.20"
+  "peerDependencies": {
+    "@grpc/grpc-js": "^1.8.21"
   },
   "devDependencies": {
+    "@grpc/grpc-js": "^1.8.21",
     "@grpc/proto-loader": "^0.7.8",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.4.5",

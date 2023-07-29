@@ -18,6 +18,14 @@ async/await functionality into both the gRPC server and the client.
     make sure the compiling target is `es2018` or higher which outputs native
     async generator functions.
 
+## Install
+
+In order to install this package, you must install **@grpc/grpc-js** as well.
+
+```sh
+npm i @grpc/grpc-js @hyurl/grpc-async
+```
+
 ## Examples
 
 The following examples first show the traditional way of implementations and
