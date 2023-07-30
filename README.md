@@ -334,12 +334,12 @@ See the major differences here?
 
 **On both sides**
 
-We define an interface `Greeter` which constraints the signature of the
-functions, which is used on the `serve()` function that guarantees
-implementations satisfying our needs, it is also used on the `connect()`
-function which allows the program producing correct methods that patched to the
-client instance. This technique allows us take benefits from the TypeScript
-typing system and reduce errors in our code.
+We define an interface `Greeter` which honors the design in the `.proto` file
+and constraints the signature of the functions, this interface is used on the
+`serve()` function that guarantees implementations satisfying our designs, it is
+also used on the `connect()` function which allows the program producing correct
+methods that patched to the client instance. This technique allows us take
+benefits from the TypeScript typing system and reduce errors in our code.
 
 ## API
 

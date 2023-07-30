@@ -1,12 +1,18 @@
 syntax = "proto3";
 
-option java_multiple_files = true;
-option java_package = "com.hyurl.grpc.examples";
-option java_outer_classname = "ExamplesProto";
-option objc_class_prefix = "EXP";
 option go_package = "./examples";
 
 package examples;
+
+// The request message containing the user's name.
+message Request {
+  string name = 1;
+}
+
+// The response message containing the greetings
+message Response {
+  string message = 1;
+}
 
 // The greeting service definition.
 service Greeter {
@@ -17,14 +23,4 @@ service Greeter {
   rpc SayHelloStreamRequest(stream Request) returns (Response) {}
 
   rpc SayHelloDuplex(stream Request) returns (stream Response) {}
-}
-
-// The request message containing the user's name.
-message Request {
-  string name = 1;
-}
-
-// The response message containing the greetings
-message Response {
-  string message = 1;
 }
