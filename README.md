@@ -379,10 +379,6 @@ export type ServerReadableStream<Req, Res = void> = grpc.ServerReadableStream<Re
 
 export type ServerDuplexStream<Req, Res> = grpc.gServerDuplexStream<Req, Res> & AsyncIterable<Req>;
 
-export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
-
-export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
-
 export type ClientWritableStream<Req, Res> = grpc.ClientWritableStream<Req> & {
     returns(): Promise<Res>;
 };
@@ -390,6 +386,10 @@ export type ClientWritableStream<Req, Res> = grpc.ClientWritableStream<Req> & {
 export type ClientReadableStream<Res> = grpc.ClientReadableStream<Res> & AsyncIterable<Res>;
 
 export type ClientDuplexStream<Req, Res> = grpc.ClientDuplexStream<Req, Res> & AsyncIterable<Res>;
+
+export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
+
+export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
 
 export type ClientMethods<T extends object> = {
     [K in keyof T]: T[K] extends StreamRequestFunction<infer Req, infer Res> ? () => ClientWritableStream<Req, Res>

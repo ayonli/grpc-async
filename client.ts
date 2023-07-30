@@ -7,7 +7,7 @@ import {
     ClientDuplexStream as gClientDuplexStream,
     ServiceClientConstructor
 } from "@grpc/grpc-js";
-import { DuplexFunction, StreamRequestFunction } from "./server";
+import { ServerReadableStream, ServerDuplexStream } from "./server";
 
 const NodeVersion = parseInt(process.version.slice(1));
 
@@ -18,6 +18,10 @@ export type ClientWritableStream<Req, Res> = gClientWritableStream<Req> & {
 export type ClientReadableStream<Res> = gClientReadableStream<Res> & AsyncIterable<Res>;
 
 export type ClientDuplexStream<Req, Res> = gClientDuplexStream<Req, Res> & AsyncIterable<Res>;
+
+export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
+
+export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
 
 export type ClientMethods<T extends object> = {
     [K in keyof T]: T[K] extends StreamRequestFunction<infer Req, infer Res> ? () => ClientWritableStream<Req, Res>

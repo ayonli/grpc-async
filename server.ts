@@ -18,10 +18,6 @@ export type ServerReadableStream<Req, Res = void> = gServerReadableStream<Req, R
 
 export type ServerDuplexStream<Req, Res> = gServerDuplexStream<Req, Res> & AsyncIterable<Req>;
 
-export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
-
-export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
-
 export function serve<T extends object>(
     server: Server,
     service: ServiceClientConstructor | ServiceDefinition<T>,
