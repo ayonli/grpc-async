@@ -52,7 +52,7 @@ import {
 } from "@grpc/grpc-js"
 
 const PROTO_PATH = __dirname + '/examples/index.proto';
-const addr = "localhost:50051";
+const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true,
@@ -107,14 +107,14 @@ server.addService(examples.Greeter.service, {
     }
 });
 
-server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
+server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
     server.start();
 });
 // ==== server ====
 
 // ==== client ====
 // @ts-ignore
-const client = new examples.Greeter(addr, credentials.createInsecure());
+const client = new examples.Greeter(SERVER_ADDRESS, credentials.createInsecure());
 
 // Calling #waitForReady() is required since at this point the server may not be
 // available yet.
@@ -182,7 +182,7 @@ import {
 } from "."; // replace this with "@hyurl/grpc-async" in your code
 
 const PROTO_PATH = __dirname + '/examples/examples.proto';
-const addr = "localhost:50051";
+const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     keepCase: true,
@@ -237,14 +237,14 @@ serve<Greeter>(examples.Greeter, {
     }
 }, server);
 
-server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
+server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
     server.start();
 });
 // ==== server ====
 
 // ==== client ====
 // @ts-ignore
-const client = connect<Greeter>(examples.Greeter, addr, credentials.createInsecure());
+const client = connect<Greeter>(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
 
 (async () => {
     const reply = await client.sayHello({ name: "World" });
