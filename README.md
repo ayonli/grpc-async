@@ -296,8 +296,8 @@ See the major differences here?
 **On the server**
 
 1. Instead of calling the `server.addService()` function to register the
-    implementations, we use the `serve()` utility function, which supports
-    native async (and async generator).
+    implementation, we use the `serve()` utility function, which supports
+    native async (and async generator) functions.
 2. Instead of just using an object literal as the service implementation, we
     define a class as implementation that honors the design in the `.proto` file.
 3. Instead of accessing the `request` from the `call` context argument, we
@@ -335,19 +335,6 @@ See the major differences here?
 7. For duplex calls, instead of listening to the `data` event for responses,
     again, we use the `for await` statement to receive the responses yielded by
     the server.
-
-#### Tips of Service Class
-
-A class instance holds its own internal state, for example, we can store some
-data in a property and use it whenever we need it. And we can use `this` keyword
-to access other methods inside the class (as the above example demonstrates).
-
-However, if we're going to use the class, make sure the following rules are
-honored:
-
-- The constructor of the class takes no arguments (`0-arguments` design).
-- Only the RPC functions are modified public (they're the only ones accessible
-    outside the class scope).
 
 ## API
 
@@ -569,7 +556,7 @@ import { ConnectionManager, ServiceProxyOf } from "."; // replace this with `@hy
 
 declare global {
     // Instead of defining `services` as global constant, we define it as a
-    // namespace which contain sub namespace that corresponds the package name
+    // namespace which contains sub namespaces that corresponds the package name
     // in the .proto file.
     namespace services.examples {
         const Greeter: ServiceProxyOf<Greeter>;
