@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "A gRPC wrapper for Node.js with async functions",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "protoc:go": "protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative test/helloworld.proto",
-    "prepublishOnly": "tsc --module commonjs --target es2018 --sourceMap true --declaration true index.ts",
+    "prepublishOnly": "tsc",
     "postpublish": "ls *.js | xargs rm -f && ls *.js.map | xargs rm -f && ls *.d.ts | xargs rm -f",
     "test": "mocha -r ts-node/register test/index.ts"
   },
@@ -23,8 +24,8 @@
     "url": "https://github.com/hyurl/grpc-async/issues"
   },
   "homepage": "https://github.com/hyurl/grpc-async#readme",
-  "peerDependencies": {
-    "@grpc/grpc-js": "^1.8.21"
+  "dependencies": {
+    "tslib": "^2.6.1"
   },
   "devDependencies": {
     "@grpc/grpc-js": "^1.8.21",
@@ -34,6 +35,10 @@
     "mocha": "^10.2.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.1.6"
+  },
+  "peerDependencies": {
+    "@grpc/grpc-js": "^1.8.21",
+    "@grpc/proto-loader": "^0.7.8"
   },
   "engines": {
     "node": ">=14"

@@ -13,17 +13,18 @@ async/await functionality into both the gRPC server and the client.
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) v14+
-- [@grpc/grpc-js](https://www.npmjs.com/package/@grpc/grpc-js)
+- [@grpc/grpc-js](https://www.npmjs.com/package/@grpc/grpc-js) and [@grpc/proto-loader](https://www.npmjs.com/package/@grpc/proto-loader)
 - For server-side code, if using [TypeScript](https://www.typescriptlang.org/),
     make sure the compiling target is `es2018` or higher which outputs native
     async generator functions.
 
 ## Install
 
-In order to install this package, you must install **@grpc/grpc-js** as well.
+In order to install this package, you must install **@grpc/grpc-js** and
+**@grpc/proto-loader** as well.
 
 ```sh
-npm i @grpc/grpc-js @hyurl/grpc-async
+npm i @grpc/grpc-js @grpc/proto-loader @hyurl/grpc-async
 ```
 
 ## Examples
@@ -32,7 +33,7 @@ The following examples first show the traditional way of implementations and
 then show the async way implementations, so that we can compare how simple it is
 in the new way.
 
-### Traditional
+### Traditional Way
 
 ```ts
 import * as protoLoader from '@grpc/proto-loader';
@@ -50,7 +51,7 @@ import {
     ClientDuplexStream
 } from "@grpc/grpc-js"
 
-const PROTO_PATH = __dirname + '/test/helloworld.proto';
+const PROTO_PATH = __dirname + '/examples/helloworld.proto';
 const addr = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -168,7 +169,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
 // ==== client ====
 ```
 
-### New
+### Async Way
 
 ```ts
 import * as protoLoader from '@grpc/proto-loader';
@@ -180,7 +181,7 @@ import {
     ServerDuplexStream
 } from "."; // replace this with "@hyurl/grpc-async" in your code
 
-const PROTO_PATH = __dirname + '/test/helloworld.proto';
+const PROTO_PATH = __dirname + '/examples/helloworld.proto';
 const addr = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -285,6 +286,8 @@ const client = connect<Greeter>(helloworld.Greeter, addr, credentials.createInse
 })().catch(console.error);
 // ==== client ====
 ```
+
+*You can see more about the examples in the [examples](./examples) folder.*
 
 #### Recap
 

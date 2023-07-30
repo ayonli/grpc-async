@@ -66,7 +66,7 @@ export function connect<T extends object>(
     for (const name of Object.getOwnPropertyNames(serviceCtor.service)) {
         const def = serviceCtor.service[name];
         const fnName = def.originalName || name;
-        const originalFn = (ins as any)[fnName]?.bind(ins);
+        const originalFn = ins[fnName]?.bind(ins);
         let newFn: (data?: any) => any = null as any;
 
         if (!originalFn)
@@ -101,14 +101,12 @@ export function connect<T extends object>(
                         // connection and causing the `for await` loop to hang,
                         // so we overwrite it with `stream.destroy()` at the bottom.
                         const _end = call.end;
-                        // @ts-ignore
                         call.end = (...args: any[]) => {
-                            // @ts-ignore
-                            _end.apply(call, args);
-
                             setImmediate(() => {
                                 call.destroy();
                             });
+
+                            return _end.apply(call, args);
                         };
                     }
 
@@ -132,7 +130,6 @@ export function connect<T extends object>(
                             result = { err, reply };
                         }
                     });
-                    // @ts-ignore
                     call["returns"] = () => {
                         return new Promise<any>((resolve, reject) => {
                             if (!call.closed && !call.destroyed) {
@@ -160,7 +157,6 @@ export function connect<T extends object>(
                 }
             } as AsyncGeneratorFunction;
         } else {
-            // @ts-ignore
             newFn = (data: any, callback?: (err: unknown, reply: any) => void) => {
                 if (callback) {
                     waitForReady(void 0, (err) => {
@@ -186,7 +182,6 @@ export function connect<T extends object>(
             };
         }
 
-        // @ts-ignore
         ins[fnName] = newFn ?? originalFn;
     }
 

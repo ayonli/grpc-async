@@ -1,105 +1,20 @@
-import {
-    serve,
-    connect,
-    ServiceClient,
-    ServerReadableStream,
-    ServerDuplexStream,
-    unserve,
-    Connector,
-    ConnectionManager
-} from "../index";
-import {
-    Server,
-    ServerCredentials,
-    credentials,
-    loadPackageDefinition
-} from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
 import { deepStrictEqual, ok, strictEqual } from "assert";
 import { execSync } from "child_process";
 import { type ChildProcess, spawn } from "child_process";
 import { unlinkSync } from "fs";
 import { after, before, describe, it } from "mocha";
-
-const PROTO_PATH = __dirname + "/helloworld.proto";
-const addr = "localhost:50051";
-
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-    keepCase: true,
-    longs: String,
-    enums: String,
-    defaults: true,
-    oneofs: true
-});
-const { helloworld } = loadPackageDefinition(packageDefinition);
-
-type Request = {
-    name: string;
-};
-
-type Response = {
-    message: string;
-};
-
-interface Greeter {
-    sayHello(req: Request): Promise<Response>;
-    sayHelloStreamReply(req: Request): AsyncGenerator<Response, void, unknown>;
-    sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>): Promise<Response>;
-    sayHelloDuplex(stream: ServerDuplexStream<Request, Response>): AsyncGenerator<Response, void, unknown>;
-}
-
-const greeterImpl: Greeter = {
-    async sayHello({ name }) {
-        return { message: "Hello, " + name } as Response;
-    },
-    async *sayHelloStreamReply({ name }) {
-        yield { message: `Hello 1: ${name}` } as Response;
-        yield { message: `Hello 2: ${name}` } as Response;
-        yield { message: `Hello 3: ${name}` } as Response;
-    },
-    async sayHelloStreamRequest(stream) {
-        const names: string[] = [];
-
-        for await (const { name } of stream) {
-            names.push(name);
-        }
-
-        return { message: "Hello, " + names.join(", ") } as Response;
-    },
-    async *sayHelloDuplex(stream) {
-        for await (const { name } of stream) {
-            yield { message: "Hello, " + name } as Response;
-        }
-    }
-};
-
-class GreeterService implements Greeter {
-    async sayHello({ name }: Request) {
-        return { message: "Hello, " + name } as Response;
-    }
-
-    async *sayHelloStreamReply({ name }: Request) {
-        yield { message: `Hello 1: ${name}` } as Response;
-        yield { message: `Hello 2: ${name}` } as Response;
-        yield { message: `Hello 3: ${name}` } as Response;
-    }
-
-    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
-        const names: string[] = [];
-
-        for await (const { name } of stream) {
-            names.push(name);
-        }
-
-        return await this.sayHello({ name: names.join(", ") });
-    }
-
-    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
-        for await (const { name } of stream) {
-            yield await this.sayHello({ name });
-        }
-    }
-}
+import { Server, ServerCredentials, credentials } from "@grpc/grpc-js";
+import {
+    serve,
+    connect,
+    ServiceClient,
+    unserve,
+    Connector,
+    ConnectionManager
+} from "../index";
+import { SERVER_ADDRESS, helloworld, Request, Response } from "../examples/traditional";
+import { Greeter, GreeterStaticImpl } from "../examples/async";
+import { GreeterService } from "../examples/class";
 
 describe("node-server <=> node-client", () => {
     let server: Server;
@@ -109,15 +24,15 @@ describe("node-server <=> node-client", () => {
         server = new Server();
 
         // @ts-ignore
-        serve(helloworld.Greeter, greeterImpl, server);
+        serve(helloworld.Greeter, GreeterStaticImpl, server);
 
-        server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
+        server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
             server.start();
             done();
         });
 
         // @ts-ignore
-        client = connect(helloworld.Greeter, addr, credentials.createInsecure());
+        client = connect(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
     });
 
     after(() => {
@@ -195,7 +110,7 @@ describe("go-server <=> node-client", () => {
 
         server.on("spawn", () => {
             // @ts-ignore
-            client = connect(helloworld.Greeter, addr, credentials.createInsecure());
+            client = connect(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
             done();
         }).on("error", (err) => {
             done(err);
@@ -274,13 +189,13 @@ describe("service class", () => {
         // @ts-ignore
         serve(helloworld.Greeter, GreeterService, server);
 
-        server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
+        server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
             server.start();
             done();
         });
 
         // @ts-ignore
-        client = connect(helloworld.Greeter, addr, credentials.createInsecure());
+        client = connect(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
     });
 
     it("should call the async function as expected", async () => {
@@ -500,12 +415,12 @@ describe("Connector", () => {
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
         const server = new Server();
-        const addr = "localhost:50054";
+        const address = "localhost:50054";
         // @ts-ignore
         serve(helloworld.Greeter, GreeterService, server);
         servers.push(server);
         await new Promise<void>((resolve, reject) => {
-            server.bindAsync(addr, ServerCredentials.createInsecure(), (err) => {
+            server.bindAsync(address, ServerCredentials.createInsecure(), (err) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -515,12 +430,12 @@ describe("Connector", () => {
             });
         });
 
-        client.addServer(addr, credentials.createInsecure());
+        client.addServer(address, credentials.createInsecure());
 
         const result4 = await client.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result4, { message: "Hello, World" });
 
-        client.removeServer(addr);
+        client.removeServer(address);
 
         const result5 = await client.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result5, { message: "Hello, World. I'm server 2" });

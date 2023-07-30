@@ -100,7 +100,6 @@ export function serve<T extends object>(
         implementations[fnName] = newFn ?? originalFn;
     }
 
-    // @ts-ignore
     server.addService(_service, implementations);
 }
 

@@ -1,0 +1,39 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es2018",
+        "newLine": "LF",
+        "importHelpers": true,
+        "noUnusedParameters": true,
+        "noUnusedLocals": true,
+        "noImplicitThis": true,
+        "sourceMap": true,
+        "declaration": true,
+        "paths": {
+            "@hyurl/grpc-async": [
+                "."
+            ]
+        }
+    },
+    "include": [
+        "*.ts",
+    ],
+    "ts-node": {
+        "compilerOptions": {
+            "module": "commonjs",
+            "target": "es2018",
+            "rootDir": "test/",
+            "noEmit": true,
+            "noUnusedParameters": true,
+            "noUnusedLocals": true
+        },
+        "include": [
+            "./test/*.ts"
+        ],
+        "paths": {
+            "@hyurl/grpc-async": [
+                "../index"
+            ]
+        }
+    }
+}
