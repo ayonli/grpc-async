@@ -4,7 +4,7 @@ import {
     ServerReadableStream,
     ServerDuplexStream
 } from "../index"; // replace this with "@hyurl/grpc-async" in your code
-import { SERVER_ADDRESS, helloworld, Request, Response} from "./traditional";
+import { SERVER_ADDRESS, examples, Request, Response} from "./traditional";
 import { Greeter, clientMain } from "./async";
 
 export class GreeterService implements Greeter {
@@ -40,7 +40,7 @@ if (require.main?.filename === __filename) {
     const server = new Server();
 
     // @ts-ignore
-    serve<Greeter>(helloworld.Greeter, GreeterService, server);
+    serve<Greeter>(examples.Greeter, GreeterService, server);
 
     server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
         server.start();

@@ -12,7 +12,7 @@ import {
     ServiceProxy,
     ConnectionManager
 } from "../index";
-import { SERVER_ADDRESS, helloworld, Request, Response } from "../examples/traditional";
+import { SERVER_ADDRESS, examples, Request, Response } from "../examples/traditional";
 import { Greeter, GreeterStaticImpl } from "../examples/async";
 import { GreeterService } from "../examples/class";
 import _try from "dotry";
@@ -25,7 +25,7 @@ describe("node-server <=> node-client", () => {
         server = new Server();
 
         // @ts-ignore
-        serve(helloworld.Greeter, GreeterStaticImpl, server);
+        serve(examples.Greeter, GreeterStaticImpl, server);
 
         server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
             server.start();
@@ -33,7 +33,7 @@ describe("node-server <=> node-client", () => {
         });
 
         // @ts-ignore
-        client = connect(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+        client = connect(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
     });
 
     after(() => {
@@ -106,17 +106,17 @@ describe("go-server <=> node-client", () => {
         // and when the go process is killed, the real process the holds the port
         // still hangs and hangs the Node.js process as well, reason is unknown.
         this.timeout(120_000); // this could take a while for go installing dependencies
-        execSync("go build main.go", { cwd: __dirname + "/go" });
-        server = spawn("./main", { cwd: __dirname + "/go" });
+        execSync("go build main.go", { cwd: __dirname });
+        server = spawn(__dirname + "/main");
 
         server.on("spawn", () => {
             // @ts-ignore
-            client = connect(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+            client = connect(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
             done();
         }).on("error", (err) => {
             done(err);
         }).on("exit", () => {
-            unlinkSync(__dirname + "/go/main");
+            unlinkSync(__dirname + "/main");
         });
     });
 
@@ -188,7 +188,7 @@ describe("service class", () => {
         server = new Server();
 
         // @ts-ignore
-        serve(helloworld.Greeter, GreeterService, server);
+        serve(examples.Greeter, GreeterService, server);
 
         server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
             server.start();
@@ -196,7 +196,7 @@ describe("service class", () => {
         });
 
         // @ts-ignore
-        client = connect(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+        client = connect(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
     });
 
     it("should call the async function as expected", async () => {
@@ -261,9 +261,9 @@ describe("service class", () => {
 
         before(() => {
             // @ts-ignore
-            unserve(helloworld.Greeter, server);
+            unserve(examples.Greeter, server);
             // @ts-ignore
-            serve(helloworld.Greeter, NewGreeterService, server);
+            serve(examples.Greeter, NewGreeterService, server);
         });
 
         after(() => {
@@ -312,13 +312,13 @@ describe("ServiceProxy", () => {
 
             if (i === 0) {
                 // @ts-ignore
-                serve(helloworld.Greeter, GreeterService1, server);
+                serve(examples.Greeter, GreeterService1, server);
             } else if (i === 1) {
                 // @ts-ignore
-                serve(helloworld.Greeter, GreeterService2, server);
+                serve(examples.Greeter, GreeterService2, server);
             } else if (i === 2) {
                 // @ts-ignore
-                serve(helloworld.Greeter, GreeterService3, server);
+                serve(examples.Greeter, GreeterService3, server);
             }
 
             await new Promise<void>((resolve, reject) => {
@@ -345,9 +345,9 @@ describe("ServiceProxy", () => {
 
     it("should balance the load as expected", async () => {
         const proxy = new ServiceProxy<Greeter>({
-            package: "helloworld",
+            package: "examples",
             // @ts-ignore
-            service: helloworld.Greeter
+            service: examples.Greeter
         }, addresses.map(address => ({
             address,
             credentials: credentials.createInsecure(),
@@ -367,9 +367,9 @@ describe("ServiceProxy", () => {
 
     it("should balance the load via a custom route resolver", async () => {
         const proxy = new ServiceProxy<Greeter>({
-            package: "helloworld",
+            package: "examples",
             // @ts-ignore
-            service: helloworld.Greeter
+            service: examples.Greeter
         }, addresses.map(address => ({
             address,
             credentials: credentials.createInsecure(),
@@ -398,9 +398,9 @@ describe("ServiceProxy", () => {
 
     it("should dynamically add and remove server as expected", async () => {
         const proxy = new ServiceProxy<Greeter>({
-            package: "helloworld",
+            package: "examples",
             // @ts-ignore
-            service: helloworld.Greeter
+            service: examples.Greeter
         }, addresses.map(address => ({
             address,
             credentials: credentials.createInsecure(),
@@ -418,7 +418,7 @@ describe("ServiceProxy", () => {
         const server = new Server();
         const address = "localhost:50054";
         // @ts-ignore
-        serve(helloworld.Greeter, GreeterService, server);
+        serve(examples.Greeter, GreeterService, server);
         servers.push(server);
         await new Promise<void>((resolve, reject) => {
             server.bindAsync(address, ServerCredentials.createInsecure(), (err) => {
@@ -449,9 +449,9 @@ describe("ServiceProxy", () => {
 
         it("should register proxy as expected", async () => {
             const proxy = new ServiceProxy<Greeter>({
-                package: "helloworld",
+                package: "examples",
                 // @ts-ignore
-                service: helloworld.Greeter
+                service: examples.Greeter
             }, addresses.map(address => ({
                 address,
                 credentials: credentials.createInsecure(),
@@ -461,7 +461,7 @@ describe("ServiceProxy", () => {
             ok(!manager.register(proxy));
 
             const name = proxy.packageName + "." + proxy.serviceCtor.serviceName;
-            strictEqual(name, "helloworld.Greeter");
+            strictEqual(name, "examples.Greeter");
 
             const ins1 = manager.getInstanceOf(proxy);
             const result1 = await ins1?.sayHello({ name: "World" });
@@ -478,16 +478,16 @@ describe("ServiceProxy", () => {
             ok(!manager.deregister(proxy));
 
             const [err2] = _try(() => manager.getInstanceOf(name));
-            strictEqual(String(err2), "ReferenceError: service helloworld.Greeter is not registered");
+            strictEqual(String(err2), "ReferenceError: service examples.Greeter is not registered");
 
             manager.close();
         });
 
         it("should use chaining syntax as expected", async () => {
             const proxy = new ServiceProxy<Greeter>({
-                package: "helloworld",
+                package: "examples",
                 // @ts-ignore
-                service: helloworld.Greeter
+                service: examples.Greeter
             }, addresses.map(address => ({
                 address,
                 credentials: credentials.createInsecure(),
@@ -497,7 +497,7 @@ describe("ServiceProxy", () => {
             const services = manager.useChainingSyntax();
 
             // @ts-ignore
-            const ins = services.helloworld.Greeter() as ServiceClient<Greeter>;
+            const ins = services.examples.Greeter() as ServiceClient<Greeter>;
             const result1 = await ins.sayHello({ name: "World" });
             deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
         });

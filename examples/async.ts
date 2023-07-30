@@ -5,7 +5,7 @@ import {
     ServerReadableStream,
     ServerDuplexStream
 } from "../index"; // replace this with "@hyurl/grpc-async" in your code
-import { SERVER_ADDRESS, helloworld, Request, Response } from "./traditional";
+import { SERVER_ADDRESS, examples, Request, Response } from "./traditional";
 
 export interface Greeter {
     sayHello(req: Request): Promise<Response>;
@@ -41,7 +41,7 @@ export const GreeterStaticImpl: Greeter = {
 
 export async function clientMain() {
     // @ts-ignore
-    const client = connect<Greeter>(helloworld.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+    const client = connect<Greeter>(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
     const jobs: Promise<void>[] = [];
 
     jobs.push((async () => {
@@ -93,7 +93,7 @@ if (require.main?.filename === __filename) {
     const server = new Server();
 
     // @ts-ignore
-    serve<Greeter>(helloworld.Greeter, GreeterStaticImpl, server);
+    serve<Greeter>(examples.Greeter, GreeterStaticImpl, server);
 
     server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
         server.start();

@@ -260,11 +260,11 @@ export class ConnectionManager {
      * namespaces and proxy constructors that can be used as a syntax sugar.
      * @example
      *  // Instead of this:
-     *  const ins = manager.getInstanceOf<Greeter>("helloworld.Greeter");
+     *  const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
      * 
      *  // We do this:
      *  const services = manager.useChainingSyntax();
-     *  const ins = services.helloworld.Greeter();
+     *  const ins = services.examples.Greeter();
      */
     useChainingSyntax() {
         return new ChainingProxy("", this) as any as ChainingProxyInterface;

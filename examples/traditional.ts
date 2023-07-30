@@ -13,7 +13,7 @@ import {
     ClientDuplexStream
 } from "@grpc/grpc-js";
 
-const PROTO_PATH = __dirname + '/helloworld.proto';
+const PROTO_PATH = __dirname + '/index.proto';
 export const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -23,7 +23,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-export const { helloworld } = loadPackageDefinition(packageDefinition);
+export const { examples } = loadPackageDefinition(packageDefinition);
 
 export type Request = {
     name: string;
@@ -37,7 +37,7 @@ if (require.main?.filename === __filename) {
     // ==== server ====
     const server = new Server();
     // @ts-ignore
-    server.addService(helloworld.Greeter.service, {
+    server.addService(examples.Greeter.service, {
         sayHello: (
             call: ServerUnaryCall<Request, Response>,
             callback: (err: Error, reply: Response) => void
@@ -80,7 +80,7 @@ if (require.main?.filename === __filename) {
 
     // ==== client ====
     // @ts-ignore
-    const client = new helloworld.Greeter(SERVER_ADDRESS, credentials.createInsecure());
+    const client = new examples.Greeter(SERVER_ADDRESS, credentials.createInsecure());
 
     // Calling #waitForReady() is required since at this point the server may not be
     // available yet.

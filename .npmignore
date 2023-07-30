@@ -6,3 +6,4 @@ examples
 *.ts
 !*.d.ts
 tsconfig.json
+go.*

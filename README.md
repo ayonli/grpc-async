@@ -51,7 +51,7 @@ import {
     ClientDuplexStream
 } from "@grpc/grpc-js"
 
-const PROTO_PATH = __dirname + '/examples/helloworld.proto';
+const PROTO_PATH = __dirname + '/examples/index.proto';
 const addr = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -61,7 +61,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-const { helloworld } = loadPackageDefinition(packageDefinition);
+const { examples } = loadPackageDefinition(packageDefinition);
 
 type Request = {
     name: string;
@@ -74,7 +74,7 @@ type Response = {
 // ==== server ====
 const server = new Server();
 // @ts-ignore
-server.addService(helloworld.Greeter.service, {
+server.addService(examples.Greeter.service, {
     sayHello: (
         call: ServerUnaryCall<Request, Response>,
         callback: (err: Error, reply: Response) => void
@@ -114,7 +114,7 @@ server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
 
 // ==== client ====
 // @ts-ignore
-const client = new helloworld.Greeter(addr, credentials.createInsecure());
+const client = new examples.Greeter(addr, credentials.createInsecure());
 
 // Calling #waitForReady() is required since at this point the server may not be
 // available yet.
@@ -181,7 +181,7 @@ import {
     ServerDuplexStream
 } from "."; // replace this with "@hyurl/grpc-async" in your code
 
-const PROTO_PATH = __dirname + '/examples/helloworld.proto';
+const PROTO_PATH = __dirname + '/examples/examples.proto';
 const addr = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -191,7 +191,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-const { helloworld } = loadPackageDefinition(packageDefinition);
+const { examples } = loadPackageDefinition(packageDefinition);
 
 type Request = {
     name: string;
@@ -212,7 +212,7 @@ interface Greeter {
 const server = new Server()
 
 // @ts-ignore
-serve<Greeter>(helloworld.Greeter, {
+serve<Greeter>(examples.Greeter, {
     async sayHello({ name }: Request) {
         return { message: "Hello, " + name } as Response;
     },
@@ -244,7 +244,7 @@ server.bindAsync(addr, ServerCredentials.createInsecure(), () => {
 
 // ==== client ====
 // @ts-ignore
-const client = connect<Greeter>(helloworld.Greeter, addr, credentials.createInsecure());
+const client = connect<Greeter>(examples.Greeter, addr, credentials.createInsecure());
 
 (async () => {
     const reply = await client.sayHello({ name: "World" });
@@ -447,7 +447,7 @@ class GreeterService implements Greeter { // or just class Greeter {}
 // ==== server ====
 server = new Server();
 // @ts-ignorea
-serve<Greeter>(helloworld.Greeter, GreeterService, server);
+serve<Greeter>(examples.Greeter, GreeterService, server);
 
 // ...
 ```
@@ -481,9 +481,9 @@ import { ServiceProxy } from "."; // replace this with `@hyurl/grpc-async` in yo
 
 // imagine we have three server instances run on the same server (localhost).
 const proxy = new ServiceProxy({
-    package: "helloworld", // same package name in the .proto file
+    package: "examples", // same package name in the .proto file
     // @ts-ignore
-    service: helloworld.Greeter,
+    service: examples.Greeter,
 }, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
@@ -508,9 +508,9 @@ const proxy = new ServiceProxy({
 // We can define the route resolver to achieve custom load balancing strategy.
 import hash from "string-hash"; // assuming this package exists
 const proxy2 = new ServiceProxy({
-    package: "helloworld", // same package name in the .proto file
+    package: "examples", // same package name in the .proto file
     // @ts-ignore
-    service: helloworld.Greeter,
+    service: examples.Greeter,
 }, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
@@ -566,9 +566,9 @@ import { ServiceProxy, ConnectionManager } from "."; // replace this with `@hyur
 
 // imagine we have three server instances run on the same server (localhost).
 const proxy = new ServiceProxy({
-    package: "helloworld", // same package name in the .proto file
+    package: "examples", // same package name in the .proto file
     // @ts-ignore
-    service: helloworld.Greeter,
+    service: examples.Greeter,
 }, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
@@ -580,7 +580,7 @@ const manager = new ConnectionManager();
 manager.register(proxy);
 
 // Instead of calling `proxy.getInstance()`, we do this:
-const ins = manager.getInstanceOf<Greeter>("helloworld.Greeter");
+const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
 ```
 
 A client or a proxy always binds a specific service client constructor and is
@@ -607,7 +607,7 @@ const manager = global["services"] = new ConnectionManager();
 manager.register(proxy);
 
 // and use it anywhere
-const ins = services.getInstanceOf<Greeter>("helloworld.Greeter");
+const ins = services.getInstanceOf<Greeter>("examples.Greeter");
 ```
 
 **Further more**, we can extend our `services` via chaining syntax, make our code
@@ -621,7 +621,7 @@ declare global {
     // Instead of defining `services` as global constant, we define it as a
     // namespace which contain sub namespace that corresponds the package name
     // in the .proto file.
-    namespace services.helloworld {
+    namespace services.examples {
         const Greeter: ServiceProxyOf<Greeter>;
     }
 }
@@ -634,7 +634,7 @@ manager.register(proxy);
 global["services"] = manager.useChainingSyntax();
 
 // and use it anywhere
-const ins = services.helloworld.Greeter();
+const ins = services.examples.Greeter();
 ```
 
 For more information about the `ServiceProxy` and the `ConnectionManager`, please
