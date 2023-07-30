@@ -23,19 +23,12 @@ export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>
 export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
 
 export function serve<T extends object>(
+    server: Server,
     service: ServiceClientConstructor | ServiceDefinition<T>,
-    impl: T | (new () => T),
-    server: Server
+    instance: T
 ) {
     const implementations: { [name: string]: (data?: any) => any; } = {};
     let _service: ServiceDefinition<any>;
-    let ins: any;
-
-    if (typeof impl === "function") {
-        ins = new impl();
-    } else {
-        ins = impl;
-    }
 
     if (service instanceof Function && service.service && service.serviceName) {
         _service = service.service;
@@ -50,10 +43,10 @@ export function serve<T extends object>(
         let fnName: string;
 
         if (def.originalName) {
-            originalFn = (ins[def.originalName] as Function)?.bind(ins) as any;
+            originalFn = (instance[def.originalName] as Function)?.bind(instance) as any;
             fnName = def.originalName;
         } else {
-            originalFn = (ins[name] as Function)?.bind(ins) as any;
+            originalFn = (instance[name] as Function)?.bind(instance) as any;
             fnName = name;
         }
 
@@ -104,8 +97,8 @@ export function serve<T extends object>(
 }
 
 export function unserve<T extends object>(
-    service: ServiceClientConstructor | ServiceDefinition<T>,
-    server: Server
+    server: Server,
+    service: ServiceClientConstructor | ServiceDefinition<T>
 ) {
     let _service: ServiceDefinition<any>;
 

@@ -13,8 +13,7 @@ import {
     ConnectionManager
 } from "../index";
 import { SERVER_ADDRESS, examples, Request, Response } from "../examples/traditional";
-import { Greeter, GreeterStaticImpl } from "../examples/async";
-import { GreeterService } from "../examples/class";
+import { Greeter } from "../examples/async";
 import _try from "dotry";
 
 describe("node-server <=> node-client", () => {
@@ -25,7 +24,7 @@ describe("node-server <=> node-client", () => {
         server = new Server();
 
         // @ts-ignore
-        serve(examples.Greeter, GreeterStaticImpl, server);
+        serve(server, examples.Greeter, new Greeter());
 
         server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
             server.start();
@@ -92,6 +91,32 @@ describe("node-server <=> node-client", () => {
             { message: "Hello, Mr. World" },
             { message: "Hello, Mrs. World" }
         ]);
+    });
+
+    describe("reload service", () => {
+        class NewGreeter extends Greeter {
+            async sayHello({ name }: Request): Promise<Response> {
+                return { message: "Hi, " + name };
+            }
+        }
+
+        before(() => {
+            // @ts-ignore
+            unserve(server, examples.Greeter);
+            // @ts-ignore
+            serve(server, examples.Greeter, new NewGreeter());
+        });
+
+        after(() => {
+            client.close();
+            server.forceShutdown();
+        });
+
+        it("should call the new function as expected", async () => {
+            const result = await client.sayHello({ name: "World" });
+
+            deepStrictEqual(result, { message: "Hi, World" });
+        });
     });
 });
 
@@ -180,105 +205,6 @@ describe("go-server <=> node-client", () => {
     });
 });
 
-describe("service class", () => {
-    let server: Server;
-    let client: ServiceClient<Greeter>;
-
-    before((done) => {
-        server = new Server();
-
-        // @ts-ignore
-        serve(examples.Greeter, GreeterService, server);
-
-        server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
-            server.start();
-            done();
-        });
-
-        // @ts-ignore
-        client = connect(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
-    });
-
-    it("should call the async function as expected", async () => {
-        const result = await client.sayHello({ name: "World" });
-
-        deepStrictEqual(result, { message: "Hello, World" });
-    });
-
-    it("should call the async generator function as expected", async () => {
-        const results: Response[] = [];
-
-        for await (const result of client.sayHelloStreamReply({ name: "World" })) {
-            results.push(result);
-        }
-
-        deepStrictEqual(results, [
-            { message: "Hello 1: World" },
-            { message: "Hello 2: World" },
-            { message: "Hello 3: World" }
-        ]);
-    });
-
-    it("should make stream requests as expected", async () => {
-        const call = client.sayHelloStreamRequest();
-
-        call.write({ name: "Mr. World" });
-        call.write({ name: "Mrs. World" });
-
-        const result = await call.returns();
-
-        deepStrictEqual(result, { message: "Hello, Mr. World, Mrs. World" });
-    });
-
-    it("should make stream requests and receive stream responses as expected", async () => {
-        const call = client.sayHelloDuplex();
-
-        call.write({ name: "Mr. World" });
-        call.write({ name: "Mrs. World" });
-
-        const results: Response[] = [];
-
-        for await (const reply of call) {
-            results.push(reply);
-
-            if (results.length === 2) {
-                call.end();
-            }
-        }
-
-        deepStrictEqual(results, [
-            { message: "Hello, Mr. World" },
-            { message: "Hello, Mrs. World" }
-        ]);
-    });
-
-    describe("reload service", () => {
-        class NewGreeterService extends GreeterService {
-            async sayHello({ name }: Request): Promise<Response> {
-                return { message: "Hi, " + name };
-            }
-        }
-
-        before(() => {
-            // @ts-ignore
-            unserve(examples.Greeter, server);
-            // @ts-ignore
-            serve(examples.Greeter, NewGreeterService, server);
-        });
-
-        after(() => {
-            client.close();
-            server.forceShutdown();
-        });
-
-        it("should call the async function as expected", async () => {
-            const result = await client.sayHello({ name: "World" });
-
-            deepStrictEqual(result, { message: "Hi, World" });
-        });
-    });
-});
-
 describe("ServiceProxy", () => {
     const addresses = [
         "localhost:50051",
@@ -287,19 +213,19 @@ describe("ServiceProxy", () => {
     ];
     let servers: Server[] = [];
 
-    class GreeterService1 extends GreeterService {
+    class Greeter1 extends Greeter {
         async sayHello({ name }: Request) {
             return { message: "Hello, " + name + ". I'm server 1" } as Response;
         }
     }
 
-    class GreeterService2 extends GreeterService {
+    class Greeter2 extends Greeter {
         async sayHello({ name }: Request) {
             return { message: "Hello, " + name + ". I'm server 2" } as Response;
         }
     }
 
-    class GreeterService3 extends GreeterService {
+    class Greeter3 extends Greeter {
         async sayHello({ name }: Request) {
             return { message: "Hello, " + name + ". I'm server 3" } as Response;
         }
@@ -312,13 +238,13 @@ describe("ServiceProxy", () => {
 
             if (i === 0) {
                 // @ts-ignore
-                serve(examples.Greeter, GreeterService1, server);
+                serve(server, examples.Greeter, new Greeter1());
             } else if (i === 1) {
                 // @ts-ignore
-                serve(examples.Greeter, GreeterService2, server);
+                serve(server, examples.Greeter, new Greeter2());
             } else if (i === 2) {
                 // @ts-ignore
-                serve(examples.Greeter, GreeterService3, server);
+                serve(server, examples.Greeter, new Greeter3());
             }
 
             await new Promise<void>((resolve, reject) => {
@@ -418,7 +344,7 @@ describe("ServiceProxy", () => {
         const server = new Server();
         const address = "localhost:50054";
         // @ts-ignore
-        serve(examples.Greeter, GreeterService, server);
+        serve(server, examples.Greeter, new Greeter());
         servers.push(server);
         await new Promise<void>((resolve, reject) => {
             server.bindAsync(address, ServerCredentials.createInsecure(), (err) => {

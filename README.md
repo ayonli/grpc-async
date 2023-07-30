@@ -201,41 +201,39 @@ type Response = {
     message: string;
 };
 
-interface Greeter {
-    sayHello(req: Request): Promise<Response>;
-    sayHelloStreamReply(req: Request): AsyncGenerator<Response, void, unknown>;
-    sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>): Promise<Response>;
-    sayHelloDuplex(stream: ServerDuplexStream<Request, Response>): AsyncGenerator<Response, void, unknown>;
-}
-
-// ==== server ====
-const server = new Server()
-
-// @ts-ignore
-serve<Greeter>(examples.Greeter, {
+class Greeter {
     async sayHello({ name }: Request) {
-        return { message: "Hello, " + name } as Response;
-    },
+        return { message: 'Hello ' + name } as Response;
+    }
+
     async *sayHelloStreamReply({ name }: Request) {
-        yield { message: "Hello 1: " + name } as Response;
-        yield { message: "Hello 2: " + name } as Response;
-        yield { message: "Hello 3: " + name } as Response;
-    },
-    async sayHelloStreamRequest(stream) {
+        yield { message: `Hello 1: ${name}` } as Response;
+        yield { message: `Hello 2: ${name}` } as Response;
+        yield { message: `Hello 3: ${name}` } as Response;
+    }
+
+    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
         const names: string[] = [];
 
         for await (const { name } of stream) {
             names.push(name);
         }
 
-        return { message: "Hello, " + names.join(", ") } as Response;
-    },
-    async *sayHelloDuplex(stream) {
-        for await (const { name } of stream) {
-            yield { message: "Hello, " + name } as Response;
+        return await this.sayHello({ name: names.join(", ") });
+    }
+
+    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+        for await (const req of stream) {
+            yield await this.sayHello(req);
         }
     }
-}, server);
+}
+
+// ==== server ====
+const server = new Server()
+
+// @ts-ignore
+serve(server, examples.Greeter, new Greeter());
 
 server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
     server.start();
@@ -261,26 +259,28 @@ const client = connect<Greeter>(examples.Greeter, SERVER_ADDRESS, credentials.cr
 })().catch(console.error);
 
 (async () => {
-    const streamRequestCall = client.sayHelloStreamRequest();
-    streamRequestCall.write({ name: "Mr. World" });
-    streamRequestCall.write({ name: "Mrs. World" });
-    const reply1 = await streamRequestCall.returns();
-    console.log(reply1); // { message: "Hello, Mr. World, Mrs. World" }
+    const call = client.sayHelloStreamRequest();
+    call.write({ name: "Mr. World" });
+    call.write({ name: "Mrs. World" });
+
+    const reply = await call.returns();
+    console.log(reply); // { message: "Hello, Mr. World, Mrs. World" }
 })().catch(console.error);
 
 (async () => {
-    const duplexCall = client.sayHelloDuplex();
+    const call = client.sayHelloDuplex();
     let counter = 0;
-    duplexCall.write({ name: "Mr. World" });
-    duplexCall.write({ name: "Mrs. World" });
 
-    for await (const reply of duplexCall) {
+    call.write({ name: "Mr. World" });
+    call.write({ name: "Mrs. World" });
+
+    for await (const reply of call) {
         console.log(reply);
         // { message: "Hello, Mr. World" }
         // { message: "Hello, Mrs. World" }
 
         if (++counter === 2) {
-            duplexCall.end(); // this will cause the iterator to close
+            call.end(); // this will cause the iterator to close
         }
     }
 })().catch(console.error);
@@ -297,19 +297,21 @@ See the major differences here?
 
 1. Instead of calling the `server.addService()` function to register the
     implementations, we use the `serve()` utility function, which supports
-    native async (and async generator) functions.
-2. Instead of accessing the `request` from the `call` context argument, we
+    native async (and async generator).
+2. Instead of just using an object literal as the service implementation, we
+    define a class as implementation that honors the design in the `.proto` file.
+3. Instead of accessing the `request` from the `call` context argument, we
     receive the data directly from the function's argument, which honor the same
     design in the `.proto` file.
-3. For unary calls, instead of calling the `callback()` to send the response, we
+4. For unary calls, instead of calling the `callback()` to send the response, we
     simply return it from the function, which also honor the same design in the
     `.proto` file.
-4. For stream reply calls, instead of calling `call.write()` to send the
+5. For stream reply calls, instead of calling `call.write()` to send the
     response, we take advantage of the native `yield` expression, which
     generates results overtime.
-5. For stream request calls, instead of listening to the `data` and `end` events,
+6. For stream request calls, instead of listening to the `data` and `end` events,
     we use the `for await` statement to receive the requests sent by the client.
-6. For duplex calls, instead of listening to the `data` event for requests and
+7. For duplex calls, instead of listening to the `data` event for requests and
     calling `call.write()` to send back response, we use the `for await`
     statement and the `yield` expression which are more straightforward.
 
@@ -318,28 +320,34 @@ See the major differences here?
 1. Instead of creating the instance via a `new` expression, we use `connect()`
     utility function to generate the instance, which resolves RPC functions with
     native async support.
-2. There is no need for the `waitForReady()` since it's handled automatically
+2. We use the type `Greeter` on the `connect()` function so it can produce
+    correct methods in TypeScript that could helps us reduce errors in our code.
+3. There is no need for the `waitForReady()` since it's handled automatically
     inside the function call.
-3. For unary calls, instead of passing a callback function to retrieve the
+4. For unary calls, instead of passing a callback function to retrieve the
     response, we use the `await` expression to get the result.
-4. For stream reply calls, instead of listening to the `data` and `end` events,
+5. For stream reply calls, instead of listening to the `data` and `end` events,
     we use the `for await` statement to receive the responses yielded by the
     server.
-5. For stream request calls, instead using a callback function to receive the
+6. For stream request calls, instead using a callback function to receive the
     response, we use the `call.returns()` to retrieve the response just where
     we need it.
-6. For duplex calls, instead of listening to the `data` event for responses,
+7. For duplex calls, instead of listening to the `data` event for responses,
     again, we use the `for await` statement to receive the responses yielded by
     the server.
 
-**On both sides**
+#### Tips of Service Class
 
-We define an interface `Greeter` which honors the design in the `.proto` file
-and constraints the signature of the functions, this interface is used on the
-`serve()` function that guarantees implementations satisfying our designs, it is
-also used on the `connect()` function which allows the program producing correct
-methods that patched to the client instance. This technique allows us take
-benefits from the TypeScript typing system and reduce errors in our code.
+A class instance holds its own internal state, for example, we can store some
+data in a property and use it whenever we need it. And we can use `this` keyword
+to access other methods inside the class (as the above example demonstrates).
+
+However, if we're going to use the class, make sure the following rules are
+honored:
+
+- The constructor of the class takes no arguments (`0-arguments` design).
+- Only the RPC functions are modified public (they're the only ones accessible
+    outside the class scope).
 
 ## API
 
@@ -350,14 +358,14 @@ Anyway, I'll list them as follows:
 
 ```ts
 export function serve<T>(
+    server: grpc.Server,
     service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>,
-    impl: T | (new () => T),
-    server: grpc.Server
+    instance: T
 ): void;
 
 export function unserve<T>(
-    service: grpc.ServiceClientConstructor | ServiceDefinition<T>,
-    server: grpc.Server
+    server: grpc.Server,
+    service: grpc.ServiceClientConstructor | ServiceDefinition<T>
 ): void;
 
 export function connect<T>(
@@ -404,64 +412,6 @@ export interface ServiceClientConstructor<T extends object> {
     serviceName: string;
 }
 ```
-
-## Use Service Class
-
-Some people (me, in particular) may prefer a service class instead of an object
-literal as the implementation of the gRPC functions. It could be done by passing
-the class constructor to the `serve()` function, as the function signature shown
-above. For instance, the `Greeter` example used in this article, we can define
-its implementation in a `class`ic way.
-
-```ts
-// ...
-
-class GreeterService implements Greeter { // or just class Greeter {}
-    async sayHello({ name }: Request) {
-        return { message: 'Hello ' + name } as Response;
-    }
-
-    async *sayHelloStreamReply({ name }: Request) {
-        yield { message: `Hello 1: ${name}` } as Response;
-        yield { message: `Hello 2: ${name}` } as Response;
-        yield { message: `Hello 3: ${name}` } as Response;
-    }
-
-    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
-        const names: string[] = [];
-
-        for await (const { name } of stream) {
-            names.push(name);
-        }
-
-        return await this.sayHello({ name: names.join(", ") });
-    }
-
-    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
-        for await (const req of stream) {
-            yield await this.sayHello(req);
-        }
-    }
-}
-
-// ==== server ====
-server = new Server();
-// @ts-ignorea
-serve<Greeter>(examples.Greeter, GreeterService, server);
-
-// ...
-```
-
-A class instance holds its own internal state, for example, we can store some
-data in a property and use it whenever we need it. And we can use `this` keyword
-to access other methods inside the class (as the above example demonstrates).
-
-However, if we're going to use the class, make sure the following rules are
-honored:
-
-- The constructor of the class takes no arguments (`0-arguments` design).
-- Only the RPC functions are modified public (they're the only ones accessible
-    outside the class scope).
 
 ## Use ServiceProxy and ConnectionManager
 

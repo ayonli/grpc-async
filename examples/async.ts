@@ -7,39 +7,47 @@ import {
 } from "../index"; // replace this with "@hyurl/grpc-async" in your code
 import { SERVER_ADDRESS, examples, Request, Response } from "./traditional";
 
-export interface Greeter {
-    sayHello(req: Request): Promise<Response>;
-    sayHelloStreamReply(req: Request): AsyncGenerator<Response, void, unknown>;
-    sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>): Promise<Response>;
-    sayHelloDuplex(stream: ServerDuplexStream<Request, Response>): AsyncGenerator<Response, void, unknown>;
-}
-
-export const GreeterStaticImpl: Greeter = {
+export class Greeter {
     async sayHello({ name }: Request) {
         return { message: "Hello, " + name } as Response;
-    },
+    }
+
     async *sayHelloStreamReply({ name }: Request) {
-        yield { message: "Hello 1: " + name } as Response;
-        yield { message: "Hello 2: " + name } as Response;
-        yield { message: "Hello 3: " + name } as Response;
-    },
-    async sayHelloStreamRequest(stream) {
+        yield { message: `Hello 1: ${name}` } as Response;
+        yield { message: `Hello 2: ${name}` } as Response;
+        yield { message: `Hello 3: ${name}` } as Response;
+    }
+
+    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
         const names: string[] = [];
 
         for await (const { name } of stream) {
             names.push(name);
         }
 
-        return { message: "Hello, " + names.join(", ") } as Response;
-    },
-    async *sayHelloDuplex(stream) {
+        return await this.sayHello({ name: names.join(", ") });
+    }
+
+    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
         for await (const { name } of stream) {
-            yield { message: "Hello, " + name } as Response;
+            yield await this.sayHello({ name });
         }
     }
-};
+}
 
-export async function clientMain() {
+if (require.main?.filename === __filename) {
+    // ==== server ====
+    const server = new Server();
+
+    // @ts-ignore
+    serve<Greeter>(server, examples.Greeter, new Greeter());
+
+    server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
+        server.start();
+    });
+    // ==== server ====
+
+    // ==== client ====
     // @ts-ignore
     const client = connect<Greeter>(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
     const jobs: Promise<void>[] = [];
@@ -83,26 +91,9 @@ export async function clientMain() {
         }
     })());
 
-    await Promise.all(jobs).catch(console.error);
-
-    client.close();
-}
-
-if (require.main?.filename === __filename) {
-    // ==== server ====
-    const server = new Server();
-
-    // @ts-ignore
-    serve<Greeter>(examples.Greeter, GreeterStaticImpl, server);
-
-    server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
-        server.start();
-    });
-    // ==== server ====
-
-    // ==== client ====
-    clientMain().then(() => {
+    Promise.all(jobs).then(() => {
+        client.close();
         server.forceShutdown();
-    });
+    }).catch(console.error);
     // ==== client ====
 }
