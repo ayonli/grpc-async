@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/hyurl/grpc-async#readme",
   "dependencies": {
+    "js-magic": "^1.2.4",
     "tslib": "^2.6.1"
   },
   "devDependencies": {

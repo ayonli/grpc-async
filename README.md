@@ -602,14 +602,42 @@ declare global {
 }
 
 // @ts-ignore
-global["services"] = new ConnectionManager();
+const manager = global["services"] = new ConnectionManager();
+
+manager.register(proxy);
 
 // and use it anywhere
 const ins = services.getInstanceOf<Greeter>("helloworld.Greeter");
 ```
 
+**Further more**, we can extend our `services` via chaining syntax, make our code
+even more cleaner and elegant.
+
+```ts
+import { ConnectionManager, ServiceProxyOf } from "."; // replace this with `@hyurl/grpc-async` in your code
+// ...
+
+declare global {
+    // Instead of defining `services` as global constant, we define it as a
+    // namespace which contain sub namespace that corresponds the package name
+    // in the .proto file.
+    namespace services.helloworld {
+        const Greeter: ServiceProxyOf<Greeter>;
+    }
+}
+
+const manager = new ConnectionManager();
+
+manager.register(proxy);
+
+// @ts-ignore
+global["services"] = manager.useChainingSyntax();
+
+// and use it anywhere
+const ins = services.helloworld.Greeter();
+```
+
 For more information about the `ServiceProxy` and the `ConnectionManager`, please
-refer to the source code of their definition. They are the enhancement part of
-this package that aims to provide straightforward usage of gRPC in a project
-with services system design, however, they're not the main purpose of this
-package, which is still to bring async support for gRPC in Node.js.
+refer to the [source code](./proxy.ts) of their definition. They are the
+enhancement part of this package that aims to provide straightforward usage of
+gRPC in a project with services system design.

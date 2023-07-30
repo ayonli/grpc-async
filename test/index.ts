@@ -344,7 +344,7 @@ describe("ServiceProxy", () => {
     });
 
     it("should balance the load as expected", async () => {
-        const client = new ServiceProxy<Greeter>({
+        const proxy = new ServiceProxy<Greeter>({
             package: "helloworld",
             // @ts-ignore
             service: helloworld.Greeter
@@ -353,20 +353,20 @@ describe("ServiceProxy", () => {
             credentials: credentials.createInsecure(),
         })));
 
-        const result1 = await client.getInstance().sayHello({ name: "World" });
+        const result1 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-        const result2 = await client.getInstance().sayHello({ name: "World" });
+        const result2 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-        const result3 = await client.getInstance().sayHello({ name: "World" });
+        const result3 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
-        client.close();
+        proxy.close();
     });
 
     it("should balance the load via a custom route resolver", async () => {
-        const client = new ServiceProxy<Greeter>({
+        const proxy = new ServiceProxy<Greeter>({
             package: "helloworld",
             // @ts-ignore
             service: helloworld.Greeter
@@ -382,22 +382,22 @@ describe("ServiceProxy", () => {
         });
 
         const req1: Request = { name: "Mr. World" };
-        const result1 = await client.getInstance(req1).sayHello(req1);
+        const result1 = await proxy.getInstance(req1).sayHello(req1);
         deepStrictEqual(result1, { message: "Hello, Mr. World. I'm server 1" });
 
         const req2: Request = { name: "Mr. World" };
-        const result2 = await client.getInstance(req2).sayHello(req2);
+        const result2 = await proxy.getInstance(req2).sayHello(req2);
         deepStrictEqual(result2, { message: "Hello, Mr. World. I'm server 1" });
 
         const req3: Request = { name: "Mrs. World" };
-        const result3 = await client.getInstance(req3).sayHello(req3);
+        const result3 = await proxy.getInstance(req3).sayHello(req3);
         deepStrictEqual(result3, { message: "Hello, Mrs. World. I'm server 2" });
 
-        client.close();
+        proxy.close();
     });
 
     it("should dynamically add and remove server as expected", async () => {
-        const client = new ServiceProxy<Greeter>({
+        const proxy = new ServiceProxy<Greeter>({
             package: "helloworld",
             // @ts-ignore
             service: helloworld.Greeter
@@ -406,13 +406,13 @@ describe("ServiceProxy", () => {
             credentials: credentials.createInsecure(),
         })));
 
-        const result1 = await client.getInstance().sayHello({ name: "World" });
+        const result1 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-        const result2 = await client.getInstance().sayHello({ name: "World" });
+        const result2 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-        const result3 = await client.getInstance().sayHello({ name: "World" });
+        const result3 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
         const server = new Server();
@@ -431,24 +431,24 @@ describe("ServiceProxy", () => {
             });
         });
 
-        client.addServer(address, credentials.createInsecure());
+        proxy.addServer(address, credentials.createInsecure());
 
-        const result4 = await client.getInstance().sayHello({ name: "World" });
+        const result4 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result4, { message: "Hello, World" });
 
-        client.removeServer(address);
+        proxy.removeServer(address);
 
-        const result5 = await client.getInstance().sayHello({ name: "World" });
+        const result5 = await proxy.getInstance().sayHello({ name: "World" });
         deepStrictEqual(result5, { message: "Hello, World. I'm server 2" });
 
-        client.close();
+        proxy.close();
     });
 
     describe("ConnectionManager", () => {
         const manager = new ConnectionManager();
 
         it("should register proxy as expected", async () => {
-            const client = new ServiceProxy<Greeter>({
+            const proxy = new ServiceProxy<Greeter>({
                 package: "helloworld",
                 // @ts-ignore
                 service: helloworld.Greeter
@@ -457,13 +457,13 @@ describe("ServiceProxy", () => {
                 credentials: credentials.createInsecure(),
             })));
 
-            ok(manager.register(client));
-            ok(!manager.register(client));
+            ok(manager.register(proxy));
+            ok(!manager.register(proxy));
 
-            const name = client.packageName + "." + client.serviceCtor.serviceName;
+            const name = proxy.packageName + "." + proxy.serviceCtor.serviceName;
             strictEqual(name, "helloworld.Greeter");
 
-            const ins1 = manager.getInstanceOf(client);
+            const ins1 = manager.getInstanceOf(proxy);
             const result1 = await ins1?.sayHello({ name: "World" });
             deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
@@ -475,12 +475,31 @@ describe("ServiceProxy", () => {
             strictEqual(String(err1), "ReferenceError: service foo.Greeter is not registered");
 
             ok(manager.deregister(name));
-            ok(!manager.deregister(client));
+            ok(!manager.deregister(proxy));
 
             const [err2] = _try(() => manager.getInstanceOf(name));
             strictEqual(String(err2), "ReferenceError: service helloworld.Greeter is not registered");
 
             manager.close();
+        });
+
+        it("should use chaining syntax as expected", async () => {
+            const proxy = new ServiceProxy<Greeter>({
+                package: "helloworld",
+                // @ts-ignore
+                service: helloworld.Greeter
+            }, addresses.map(address => ({
+                address,
+                credentials: credentials.createInsecure(),
+            })));
+            manager.register(proxy);
+
+            const services = manager.useChainingSyntax();
+
+            // @ts-ignore
+            const ins = services.helloworld.Greeter() as ServiceClient<Greeter>;
+            const result1 = await ins.sayHello({ name: "World" });
+            deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
         });
     });
 });
