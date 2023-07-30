@@ -189,10 +189,10 @@ export function connect<T extends object>(
 }
 
 /**
- * Connector gives the ability to connect to multiple servers and implement
- * custom load balancing algorithms.
+ * ServiceProxy gives the ability to connect to multiple servers and implement
+ * custom client-side load balancing algorithms.
  */
-export class Connector<T extends object> {
+export class ServiceProxy<T extends object> {
     readonly packageName: string;
     readonly serviceCtor: ServiceClientConstructor<T>;
     protected instances: { [address: string]: ServiceClient<T>; } = {};
@@ -266,7 +266,7 @@ export class Connector<T extends object> {
     /**
      * Retrieves an instance of the service client.
      * @param routeParams If a custom `routeResolver` is provided when initiating
-     *  the connector, this argument will be passed to the function for route
+     *  the proxy, this argument will be passed to the function for route
      *  calculation, otherwise, it has no effect.
      * @returns 
      */
@@ -339,19 +339,19 @@ export class Connector<T extends object> {
 }
 
 /**
- * ConnectionManager provides a place to manage all clients and retrieve
+ * ConnectionManager provides a place to manage all service proxies and retrieve
  * instances via a general approach.
  */
 export class ConnectionManager {
-    protected registry = new Map<string, Connector<any>>();
+    protected registry = new Map<string, ServiceProxy<any>>();
 
-    register(connector: Connector<any>) {
-        const name = connector.packageName + "." + connector.serviceCtor.serviceName;
+    register(proxy: ServiceProxy<any>) {
+        const name = proxy.packageName + "." + proxy.serviceCtor.serviceName;
 
         if (this.registry.has(name)) {
             return false;
         } else {
-            this.registry.set(name, connector);
+            this.registry.set(name, proxy);
             return true;
         }
     }
@@ -362,15 +362,15 @@ export class ConnectionManager {
      *  service (includes the package name, concatenated with `.`).
      * @returns 
      */
-    deregister(target: string | Connector<any>, closeConnection = false) {
+    deregister(target: string | ServiceProxy<any>, closeConnection = false) {
         const { packageName, serviceName } = this.destructPackageAndServiceNames(target);
         const name = packageName + "." + serviceName;
 
         if (closeConnection) {
-            const connector = this.registry.get(name);
+            const proxy = this.registry.get(name);
 
-            if (connector) {
-                connector.close();
+            if (proxy) {
+                proxy.close();
             } else {
                 return false;
             }
@@ -384,20 +384,27 @@ export class ConnectionManager {
      * @param target If the target is a string, it is the full name of the
      *  service (includes the package name, concatenated with `.`).
      * @param routeParams If a custom `routeResolver` is provided when initiating
-     *  the connector, this argument will be passed to the function for route
+     *  the proxy, this argument will be passed to the function for route
      *  calculation, otherwise, it has no effect.
-     * @returns 
+     * @throws If the target service is not registered, a ReferenceError will be
+     *  thrown.
      */
-    getInstance<T extends object>(
-        target: string | Connector<T>,
+    getInstanceOf<T extends object>(
+        target: string | ServiceProxy<T>,
         routeParams: any = null
-    ): ServiceClient<T> | null {
+    ): ServiceClient<T> {
         const { packageName, serviceName } = this.destructPackageAndServiceNames(target);
         const name = packageName + "." + serviceName;
-        return this.registry.get(name)?.getInstance(routeParams) ?? null;
+        const proxy = this.registry.get(name);
+
+        if (proxy) {
+            return proxy.getInstance(routeParams);
+        } else {
+            throw new ReferenceError(`service ${name} is not registered`);
+        }
     }
 
-    private destructPackageAndServiceNames(target: string | Connector<any>) {
+    private destructPackageAndServiceNames(target: string | ServiceProxy<any>) {
         let packageName: string;
         let serviceName: string;
 
@@ -419,11 +426,11 @@ export class ConnectionManager {
     }
 
     /**
-     * Closes all the connections of all connectors.
+     * Closes all the connections of all proxies.
      */
     close() {
-        this.registry.forEach(connector => {
-            connector.close();
+        this.registry.forEach(proxy => {
+            proxy.close();
         });
     }
 }

@@ -9,12 +9,13 @@ import {
     connect,
     ServiceClient,
     unserve,
-    Connector,
+    ServiceProxy,
     ConnectionManager
 } from "../index";
 import { SERVER_ADDRESS, helloworld, Request, Response } from "../examples/traditional";
 import { Greeter, GreeterStaticImpl } from "../examples/async";
 import { GreeterService } from "../examples/class";
+import _try from "dotry";
 
 describe("node-server <=> node-client", () => {
     let server: Server;
@@ -278,7 +279,7 @@ describe("service class", () => {
     });
 });
 
-describe("Connector", () => {
+describe("ServiceProxy", () => {
     const addresses = [
         "localhost:50051",
         "localhost:50052",
@@ -343,7 +344,7 @@ describe("Connector", () => {
     });
 
     it("should balance the load as expected", async () => {
-        const client = new Connector<Greeter>({
+        const client = new ServiceProxy<Greeter>({
             package: "helloworld",
             // @ts-ignore
             service: helloworld.Greeter
@@ -365,7 +366,7 @@ describe("Connector", () => {
     });
 
     it("should balance the load via a custom route resolver", async () => {
-        const client = new Connector<Greeter>({
+        const client = new ServiceProxy<Greeter>({
             package: "helloworld",
             // @ts-ignore
             service: helloworld.Greeter
@@ -396,7 +397,7 @@ describe("Connector", () => {
     });
 
     it("should dynamically add and remove server as expected", async () => {
-        const client = new Connector<Greeter>({
+        const client = new ServiceProxy<Greeter>({
             package: "helloworld",
             // @ts-ignore
             service: helloworld.Greeter
@@ -446,8 +447,8 @@ describe("Connector", () => {
     describe("ConnectionManager", () => {
         const manager = new ConnectionManager();
 
-        it("should register connector as expected", async () => {
-            const client = new Connector<Greeter>({
+        it("should register proxy as expected", async () => {
+            const client = new ServiceProxy<Greeter>({
                 package: "helloworld",
                 // @ts-ignore
                 service: helloworld.Greeter
@@ -462,22 +463,22 @@ describe("Connector", () => {
             const name = client.packageName + "." + client.serviceCtor.serviceName;
             strictEqual(name, "helloworld.Greeter");
 
-            const ins1 = manager.getInstance(client);
+            const ins1 = manager.getInstanceOf(client);
             const result1 = await ins1?.sayHello({ name: "World" });
             deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-            const ins2 = manager.getInstance<Greeter>(name);
+            const ins2 = manager.getInstanceOf<Greeter>(name);
             const result2 = await ins2?.sayHello({ name: "World" });
             deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-            const ins3 = manager.getInstance("foo.Greeter");
-            strictEqual(ins3, null);
+            const [err1] = _try(() => manager.getInstanceOf("foo.Greeter"));
+            strictEqual(String(err1), "ReferenceError: service foo.Greeter is not registered");
 
             ok(manager.deregister(name));
             ok(!manager.deregister(client));
 
-            const ins4 = manager.getInstance(name);
-            strictEqual(ins4, null);
+            const [err2] = _try(() => manager.getInstanceOf(name));
+            strictEqual(String(err2), "ReferenceError: service helloworld.Greeter is not registered");
 
             manager.close();
         });

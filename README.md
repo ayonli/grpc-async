@@ -463,11 +463,11 @@ honored:
 - Only the RPC functions are modified public (they're the only ones accessible
     outside the class scope).
 
-## Use Connector and ConnectionManager
+## Use ServiceProxy and ConnectionManager
 
 Other than using `connect()` to connect to a certain server, we can use
-`new Connector()` to connect to multiple servers at once and leverage calls with
-a programmatic load balancer.
+`new ServiceProxy()` to connect to multiple servers at once and leverage calls with
+a programmatic client-side load balancer.
 
 Unlike the traditional load balancer which uses a
 DNS resolver that assumes our program runs on different machines, this new load
@@ -476,11 +476,11 @@ process/instances. And we can programmatically control how our traffic is routed
 to different servers on demand.
 
 ```ts
-import { Connector } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { ServiceProxy } from "."; // replace this with `@hyurl/grpc-async` in your code
 // ...
 
 // imagine we have three server instances run on the same server (localhost).
-const connector = new Connector({
+const proxy = new ServiceProxy({
     package: "helloworld", // same package name in the .proto file
     // @ts-ignore
     service: helloworld.Greeter,
@@ -491,23 +491,23 @@ const connector = new Connector({
 ]);
 
 (async () => {
-    // Be default, the connector uses round-robin algorithm for routing, so
+    // Be default, the proxy uses round-robin algorithm for routing, so
     // this call happens on the first server instance,
-    const reply1 = await connector.getInstance().sayHello({ name: "World" });
+    const reply1 = await proxy.getInstance().sayHello({ name: "World" });
 
     // this call happens on the second server instance.
-    const reply2 = await connector.getInstance().sayHello({ name: "World" });
+    const reply2 = await proxy.getInstance().sayHello({ name: "World" });
 
     // this call happens on the third server instance.
-    const reply3 = await connector.getInstance().sayHello({ name: "World" });
+    const reply3 = await proxy.getInstance().sayHello({ name: "World" });
 
     // this call happens on the first server instance.
-    const reply4 = await connector.getInstance().sayHello({ name: "World" });
+    const reply4 = await proxy.getInstance().sayHello({ name: "World" });
 })();
 
 // We can define the route resolver to achieve custom load balancing strategy.
 import hash from "string-hash"; // assuming this package exists
-const connector2 = new Connector({
+const proxy2 = new ServiceProxy({
     package: "helloworld", // same package name in the .proto file
     // @ts-ignore
     service: helloworld.Greeter,
@@ -543,15 +543,15 @@ const connector2 = new Connector({
     // These two calls will happen on the same server instance since they have
     // the same route param structure:
     const req1: Request = { name: "Mr. World" };
-    const reply1 = await connector2.getInstance(req).sayHello(req);
+    const reply1 = await proxy2.getInstance(req).sayHello(req);
 
     const req2: Request = { name: "Mrs. World" };
-    const reply2 = await connector2.getInstance(req).sayHello(req);
+    const reply2 = await proxy2.getInstance(req).sayHello(req);
 
     // This call happens on the first server since we explicitly set the server
     // address to use:
     const req3: Request = { name: "Mrs. World" };
-    const reply3 = await connector2.getInstance("localhost:50051").sayHello(req);
+    const reply3 = await proxy2.getInstance("localhost:50051").sayHello(req);
 })();
 ```
 
@@ -561,11 +561,11 @@ ConnectionManager provides a place to manage all clients and retrieve instances
 via a general approach.
 
 ```ts
-import { Connector, ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { ServiceProxy, ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
 // ...
 
 // imagine we have three server instances run on the same server (localhost).
-const connector = new Connector({
+const proxy = new ServiceProxy({
     package: "helloworld", // same package name in the .proto file
     // @ts-ignore
     service: helloworld.Greeter,
@@ -577,13 +577,13 @@ const connector = new Connector({
 
 const manager = new ConnectionManager();
 
-manager.register(connector);
+manager.register(proxy);
 
-// Instead of calling `connector.getInstance()`, we do this:
-const ins = manager.getInstance<Greeter>("helloworld.Greeter");
+// Instead of calling `proxy.getInstance()`, we do this:
+const ins = manager.getInstanceOf<Greeter>("helloworld.Greeter");
 ```
 
-A client or a connector always binds a specific service client constructor and is
+A client or a proxy always binds a specific service client constructor and is
 a scoped variable, if we are going to access them across our program in different
 places, it would very painful and may cause recursive import problem.
 
@@ -595,6 +595,7 @@ For example:
 
 ```ts
 import { ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
+// ...
 
 declare global {
     const services: ConnectionManager;
@@ -604,10 +605,10 @@ declare global {
 global["services"] = new ConnectionManager();
 
 // and use it anywhere
-const ins = services.getInstance<Greeter>("helloworld.Greeter");
+const ins = services.getInstanceOf<Greeter>("helloworld.Greeter");
 ```
 
-For more information about the `Connector` and the `ConnectionManager`, please
+For more information about the `ServiceProxy` and the `ConnectionManager`, please
 refer to the source code of their definition. They are the enhancement part of
 this package that aims to provide straightforward usage of gRPC in a project
 with services system design, however, they're not the main purpose of this
