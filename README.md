@@ -63,7 +63,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-export const examples = loadPackageDefinition(packageDefinition).examples as GrpcObject;
+const examples = loadPackageDefinition(packageDefinition).examples as GrpcObject;
 const Greeter = examples.Greeter as ServiceClientConstructor;
 
 type Request = {
