@@ -1,4 +1,4 @@
-import { Server, ServerCredentials, credentials } from "@grpc/grpc-js";
+import { Server, ServerCredentials, credentials, ServiceClientConstructor } from "@grpc/grpc-js";
 import {
     serve,
     connect,
@@ -39,8 +39,7 @@ if (require.main?.filename === __filename) {
     // ==== server ====
     const server = new Server();
 
-    // @ts-ignore
-    serve<Greeter>(server, examples.Greeter, new Greeter());
+    serve<Greeter>(server, examples.Greeter as ServiceClientConstructor, new Greeter());
 
     server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
         server.start();
@@ -48,8 +47,10 @@ if (require.main?.filename === __filename) {
     // ==== server ====
 
     // ==== client ====
-    // @ts-ignore
-    const client = connect<Greeter>(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+    const client = connect<Greeter>(
+        examples.Greeter as ServiceClientConstructor,
+        SERVER_ADDRESS,
+        credentials.createInsecure());
     const jobs: Promise<void>[] = [];
 
     jobs.push((async () => {

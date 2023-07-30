@@ -39,6 +39,8 @@ in the new way.
 import * as protoLoader from '@grpc/proto-loader';
 import {
     loadPackageDefinition,
+    GrpcObject,
+    ServiceClientConstructor,
     Server,
     ServerUnaryCall,
     ServerWritableStream,
@@ -61,7 +63,8 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-const { examples } = loadPackageDefinition(packageDefinition);
+export const examples = loadPackageDefinition(packageDefinition).examples as GrpcObject;
+const Greeter = examples.Greeter as ServiceClientConstructor;
 
 type Request = {
     name: string;
@@ -73,8 +76,7 @@ type Response = {
 
 // ==== server ====
 const server = new Server();
-// @ts-ignore
-server.addService(examples.Greeter.service, {
+server.addService(Greeter.service, {
     sayHello: (
         call: ServerUnaryCall<Request, Response>,
         callback: (err: Error, reply: Response) => void
@@ -113,8 +115,7 @@ server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
 // ==== server ====
 
 // ==== client ====
-// @ts-ignore
-const client = new examples.Greeter(SERVER_ADDRESS, credentials.createInsecure());
+const client = new Greeter(SERVER_ADDRESS, credentials.createInsecure());
 
 // Calling #waitForReady() is required since at this point the server may not be
 // available yet.
@@ -173,7 +174,14 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
 
 ```ts
 import * as protoLoader from '@grpc/proto-loader';
-import { loadPackageDefinition, Server, ServerCredentials, credentials } from "@grpc/grpc-js";
+import {
+    loadPackageDefinition,
+    GrpcObject,
+    ServiceClientConstructor,
+    Server,
+    ServerCredentials,
+    credentials
+} from "@grpc/grpc-js";
 import {
     serve,
     connect,
@@ -191,7 +199,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-const { examples } = loadPackageDefinition(packageDefinition);
+const examples = loadPackageDefinition(packageDefinition).examples as GrpcObject;
 
 type Request = {
     name: string;
@@ -232,8 +240,7 @@ class Greeter {
 // ==== server ====
 const server = new Server()
 
-// @ts-ignore
-serve(server, examples.Greeter, new Greeter());
+serve(server, examples.Greeter as ServiceClientConstructor, new Greeter());
 
 server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
     server.start();
@@ -241,8 +248,10 @@ server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
 // ==== server ====
 
 // ==== client ====
-// @ts-ignore
-const client = connect<Greeter>(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+const client = connect<Greeter>(
+    examples.Greeter as ServiceClientConstructor,
+    SERVER_ADDRESS,
+    credentials.createInsecure());
 
 (async () => {
     const reply = await client.sayHello({ name: "World" });
@@ -356,7 +365,7 @@ export function unserve<T>(
 ): void;
 
 export function connect<T>(
-    serviceCtor: grpc.ServiceClientConstructor,
+    service: grpc.ServiceClientConstructor,
     address: string,
     credentials: grpc.ChannelCredentials,
     options?: Partial<grpc.ChannelOptions> & {
@@ -382,7 +391,7 @@ export type ClientReadableStream<Res> = grpc.ClientReadableStream<Res> & AsyncIt
 
 export type ClientDuplexStream<Req, Res> = grpc.ClientDuplexStream<Req, Res> & AsyncIterable<Res>;
 
-export type WrapMethods<T extends object> = {
+export type ClientMethods<T extends object> = {
     [K in keyof T]: T[K] extends StreamRequestFunction<infer Req, infer Res> ? () => ClientWritableStream<Req, Res>
     : T[K] extends DuplexFunction<infer Req, infer Res> ? () => ClientDuplexStream<Req, Res>
     : T[K];
@@ -391,13 +400,7 @@ export type WrapMethods<T extends object> = {
 export type ServiceClient<T extends object> = Omit<grpc.Client, "waitForReady"> & {
     waitForReady(deadline?: Date | number): Promise<void>;
     waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
-} & WrapMethods<T>;
-
-export interface ServiceClientConstructor<T extends object> {
-    new(address: string, credentials: gprc.ChannelCredentials, options?: Partial<gprc.ChannelOptions>): ServiceClient<T>;
-    service: grpc.ServiceDefinition;
-    serviceName: string;
-}
+} & ClientMethods<T>;
 ```
 
 ## Use ServiceProxy and ConnectionManager
@@ -419,8 +422,7 @@ import { ServiceProxy } from "."; // replace this with `@hyurl/grpc-async` in yo
 // imagine we have three server instances run on the same server (localhost).
 const proxy = new ServiceProxy({
     package: "examples", // same package name in the .proto file
-    // @ts-ignore
-    service: examples.Greeter,
+    service: examples.Greeter as ServiceClientConstructor,
 }, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
@@ -446,8 +448,7 @@ const proxy = new ServiceProxy({
 import hash from "string-hash"; // assuming this package exists
 const proxy2 = new ServiceProxy({
     package: "examples", // same package name in the .proto file
-    // @ts-ignore
-    service: examples.Greeter,
+    service: examples.Greeter as ServiceClientConstructor,
 }, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
@@ -504,8 +505,7 @@ import { ServiceProxy, ConnectionManager } from "."; // replace this with `@hyur
 // imagine we have three server instances run on the same server (localhost).
 const proxy = new ServiceProxy({
     package: "examples", // same package name in the .proto file
-    // @ts-ignore
-    service: examples.Greeter,
+    service: examples.Greeter as ServiceClientConstructor,
 }, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },

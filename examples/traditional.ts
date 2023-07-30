@@ -10,7 +10,9 @@ import {
     credentials,
     ClientReadableStream,
     ClientWritableStream,
-    ClientDuplexStream
+    ClientDuplexStream,
+    GrpcObject,
+    ServiceClientConstructor
 } from "@grpc/grpc-js";
 
 const PROTO_PATH = __dirname + '/index.proto';
@@ -23,7 +25,8 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     defaults: true,
     oneofs: true
 });
-export const { examples } = loadPackageDefinition(packageDefinition);
+export const examples = loadPackageDefinition(packageDefinition).examples as GrpcObject;
+const Greeter = examples.Greeter as ServiceClientConstructor;
 
 export type Request = {
     name: string;
@@ -36,8 +39,7 @@ export type Response = {
 if (require.main?.filename === __filename) {
     // ==== server ====
     const server = new Server();
-    // @ts-ignore
-    server.addService(examples.Greeter.service, {
+    server.addService(Greeter.service, {
         sayHello: (
             call: ServerUnaryCall<Request, Response>,
             callback: (err: Error, reply: Response) => void
@@ -79,12 +81,11 @@ if (require.main?.filename === __filename) {
     // ==== server ====
 
     // ==== client ====
-    // @ts-ignore
-    const client = new examples.Greeter(SERVER_ADDRESS, credentials.createInsecure());
+    const client = new Greeter(SERVER_ADDRESS, credentials.createInsecure());
 
     // Calling #waitForReady() is required since at this point the server may not be
     // available yet.
-    client.waitForReady(Date.now() + 5000, (_: Error) => {
+    client.waitForReady(Date.now() + 5000, (_?: Error) => {
         client.sayHello({ name: "World" } as Request, (err: Error, reply: Response) => {
             if (err) {
                 console.error(err);

@@ -1,5 +1,10 @@
-import { ServiceClient, ServiceClientConstructor, connect } from "./client";
-import { ChannelCredentials, ChannelOptions, connectivityState } from "@grpc/grpc-js";
+import { ServiceClient, connect } from "./client";
+import {
+    ChannelCredentials,
+    ChannelOptions,
+    connectivityState,
+    ServiceClientConstructor
+} from "@grpc/grpc-js";
 import { applyMagic } from "js-magic";
 
 export type ServiceProxyOf<T extends object> = (routeParams?: any) => ServiceClient<T>;
@@ -14,7 +19,7 @@ export type ChainingProxyInterface = ServiceProxyOf<any> & {
  */
 export class ServiceProxy<T extends object> {
     readonly packageName: string;
-    readonly serviceCtor: ServiceClientConstructor<T>;
+    readonly serviceCtor: ServiceClientConstructor;
     protected instances: { [address: string]: ServiceClient<T>; } = {};
     protected acc = 0;
 
@@ -29,7 +34,7 @@ export class ServiceProxy<T extends object> {
      */
     constructor(target: {
         package: string;
-        service: ServiceClientConstructor<T>;
+        service: ServiceClientConstructor;
     }, protected servers: {
         address: string;
         credentials: ChannelCredentials,
@@ -37,7 +42,7 @@ export class ServiceProxy<T extends object> {
     }[], protected routeResolver: ((ctx: {
         servers: { address: string, state: connectivityState; }[];
         package: string;
-        service: ServiceClientConstructor<T>;
+        service: ServiceClientConstructor;
         /**
          * The route params passed when calling the `getInstance()` function, we
          * can use this object to calculate the desired route address.

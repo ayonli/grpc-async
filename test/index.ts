@@ -3,7 +3,7 @@ import { execSync } from "child_process";
 import { type ChildProcess, spawn } from "child_process";
 import { unlinkSync } from "fs";
 import { after, before, describe, it } from "mocha";
-import { Server, ServerCredentials, credentials } from "@grpc/grpc-js";
+import { Server, ServerCredentials, credentials, ServiceClientConstructor } from "@grpc/grpc-js";
 import {
     serve,
     connect,
@@ -23,16 +23,17 @@ describe("node-server <=> node-client", () => {
     before((done) => {
         server = new Server();
 
-        // @ts-ignore
-        serve(server, examples.Greeter, new Greeter());
+        serve(server, examples.Greeter as ServiceClientConstructor, new Greeter());
 
         server.bindAsync(SERVER_ADDRESS, ServerCredentials.createInsecure(), () => {
             server.start();
             done();
         });
 
-        // @ts-ignore
-        client = connect(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+        client = connect(
+            examples.Greeter as ServiceClientConstructor,
+            SERVER_ADDRESS,
+            credentials.createInsecure());
     });
 
     after(() => {
@@ -101,10 +102,8 @@ describe("node-server <=> node-client", () => {
         }
 
         before(() => {
-            // @ts-ignore
-            unserve(server, examples.Greeter);
-            // @ts-ignore
-            serve(server, examples.Greeter, new NewGreeter());
+            unserve(server, examples.Greeter as ServiceClientConstructor);
+            serve(server, examples.Greeter as ServiceClientConstructor, new NewGreeter());
         });
 
         after(() => {
@@ -135,8 +134,10 @@ describe("go-server <=> node-client", () => {
         server = spawn(__dirname + "/main");
 
         server.on("spawn", () => {
-            // @ts-ignore
-            client = connect(examples.Greeter, SERVER_ADDRESS, credentials.createInsecure());
+            client = connect(
+                examples.Greeter as ServiceClientConstructor,
+                SERVER_ADDRESS,
+                credentials.createInsecure());
             done();
         }).on("error", (err) => {
             done(err);
@@ -237,14 +238,11 @@ describe("ServiceProxy", () => {
             const server = new Server();
 
             if (i === 0) {
-                // @ts-ignore
-                serve(server, examples.Greeter, new Greeter1());
+                serve(server, examples.Greeter as ServiceClientConstructor, new Greeter1());
             } else if (i === 1) {
-                // @ts-ignore
-                serve(server, examples.Greeter, new Greeter2());
+                serve(server, examples.Greeter as ServiceClientConstructor, new Greeter2());
             } else if (i === 2) {
-                // @ts-ignore
-                serve(server, examples.Greeter, new Greeter3());
+                serve(server, examples.Greeter as ServiceClientConstructor, new Greeter3());
             }
 
             await new Promise<void>((resolve, reject) => {
@@ -272,8 +270,7 @@ describe("ServiceProxy", () => {
     it("should balance the load as expected", async () => {
         const proxy = new ServiceProxy<Greeter>({
             package: "examples",
-            // @ts-ignore
-            service: examples.Greeter
+            service: examples.Greeter as ServiceClientConstructor
         }, addresses.map(address => ({
             address,
             credentials: credentials.createInsecure(),
@@ -294,8 +291,7 @@ describe("ServiceProxy", () => {
     it("should balance the load via a custom route resolver", async () => {
         const proxy = new ServiceProxy<Greeter>({
             package: "examples",
-            // @ts-ignore
-            service: examples.Greeter
+            service: examples.Greeter as ServiceClientConstructor
         }, addresses.map(address => ({
             address,
             credentials: credentials.createInsecure(),
@@ -325,8 +321,7 @@ describe("ServiceProxy", () => {
     it("should dynamically add and remove server as expected", async () => {
         const proxy = new ServiceProxy<Greeter>({
             package: "examples",
-            // @ts-ignore
-            service: examples.Greeter
+            service: examples.Greeter as ServiceClientConstructor
         }, addresses.map(address => ({
             address,
             credentials: credentials.createInsecure(),
@@ -343,8 +338,7 @@ describe("ServiceProxy", () => {
 
         const server = new Server();
         const address = "localhost:50054";
-        // @ts-ignore
-        serve(server, examples.Greeter, new Greeter());
+        serve(server, examples.Greeter as ServiceClientConstructor, new Greeter());
         servers.push(server);
         await new Promise<void>((resolve, reject) => {
             server.bindAsync(address, ServerCredentials.createInsecure(), (err) => {
@@ -376,8 +370,7 @@ describe("ServiceProxy", () => {
         it("should register proxy as expected", async () => {
             const proxy = new ServiceProxy<Greeter>({
                 package: "examples",
-                // @ts-ignore
-                service: examples.Greeter
+                service: examples.Greeter as ServiceClientConstructor
             }, addresses.map(address => ({
                 address,
                 credentials: credentials.createInsecure(),
@@ -412,8 +405,7 @@ describe("ServiceProxy", () => {
         it("should use chaining syntax as expected", async () => {
             const proxy = new ServiceProxy<Greeter>({
                 package: "examples",
-                // @ts-ignore
-                service: examples.Greeter
+                service: examples.Greeter as ServiceClientConstructor
             }, addresses.map(address => ({
                 address,
                 credentials: credentials.createInsecure(),
@@ -422,7 +414,6 @@ describe("ServiceProxy", () => {
 
             const services = manager.useChainingSyntax();
 
-            // @ts-ignore
             const ins = services.examples.Greeter() as ServiceClient<Greeter>;
             const result1 = await ins.sayHello({ name: "World" });
             deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });

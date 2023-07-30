@@ -5,7 +5,7 @@ import {
     ClientWritableStream as gClientWritableStream,
     ClientReadableStream as gClientReadableStream,
     ClientDuplexStream as gClientDuplexStream,
-    ServiceDefinition
+    ServiceClientConstructor
 } from "@grpc/grpc-js";
 import { DuplexFunction, StreamRequestFunction } from "./server";
 
@@ -19,7 +19,7 @@ export type ClientReadableStream<Res> = gClientReadableStream<Res> & AsyncIterab
 
 export type ClientDuplexStream<Req, Res> = gClientDuplexStream<Req, Res> & AsyncIterable<Res>;
 
-export type WrapMethods<T extends object> = {
+export type ClientMethods<T extends object> = {
     [K in keyof T]: T[K] extends StreamRequestFunction<infer Req, infer Res> ? () => ClientWritableStream<Req, Res>
     : T[K] extends DuplexFunction<infer Req, infer Res> ? () => ClientDuplexStream<Req, Res>
     : T[K];
@@ -28,22 +28,16 @@ export type WrapMethods<T extends object> = {
 export type ServiceClient<T extends object> = Omit<Client, "waitForReady"> & {
     waitForReady(deadline?: Date | number): Promise<void>;
     waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
-} & WrapMethods<T>;
-
-export interface ServiceClientConstructor<T extends object> {
-    new(address: string, credentials: ChannelCredentials, options?: Partial<ChannelOptions>): ServiceClient<T>;
-    service: ServiceDefinition;
-    serviceName: string;
-}
+} & ClientMethods<T>;
 
 export function connect<T extends object>(
-    serviceCtor: ServiceClientConstructor<T>,
+    service: ServiceClientConstructor,
     address: string,
     credentials: ChannelCredentials,
     options: Partial<ChannelOptions> & { connectTimeout?: number; } = {}
 ) {
     const { connectTimeout = 120_000, ...rest } = options;
-    const ins = new serviceCtor(address, credentials, rest);
+    const ins = new service(address, credentials, rest);
 
     const _waitForReady = ins.waitForReady.bind(ins);
     const waitForReady = (deadline?: Date | number, callback?: (err: Error | void) => void) => {
@@ -62,8 +56,8 @@ export function connect<T extends object>(
 
     Object.assign(ins, { waitForReady });
 
-    for (const name of Object.getOwnPropertyNames(serviceCtor.service)) {
-        const def = serviceCtor.service[name];
+    for (const name of Object.getOwnPropertyNames(service.service)) {
+        const def = service.service[name];
         const fnName = def.originalName || name;
         const originalFn = ins[fnName]?.bind(ins);
         let newFn: (data?: any) => any = null as any;
