@@ -235,7 +235,7 @@ export type ServerConfig = {
 };
 
 /**
- * ServiceProxy gives the ability to connect to multiple servers and implement
+ * LoadBalancer gives the ability to connect to multiple servers and implement
  * custom client-side load balancing algorithms.
  */
 export class LoadBalancer<T extends object, P extends any = any> {
