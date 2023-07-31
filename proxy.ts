@@ -7,17 +7,23 @@ import {
 } from "@grpc/grpc-js";
 import { applyMagic } from "js-magic";
 
-export type ServiceProxyOf<T extends object> = (routeParams?: any) => ServiceClient<T>;
+export type ServiceProxyOf<T extends object, P extends any = any> = (routeParams?: P) => ServiceClient<T>;
 
-export type ChainingProxyInterface = ServiceProxyOf<any> & {
+export type ChainingProxyInterface = ServiceProxyOf<any, any> & {
     [nsp: string]: ChainingProxyInterface;
+};
+
+export type ServerConfig = {
+    address: string;
+    credentials: ChannelCredentials,
+    options?: Partial<ChannelOptions> & { connectTimeout?: number; };
 };
 
 /**
  * ServiceProxy gives the ability to connect to multiple servers and implement
  * custom client-side load balancing algorithms.
  */
-export class ServiceProxy<T extends object> {
+export class ServiceProxy<T extends object, P extends any = any> {
     readonly packageName: string;
     readonly serviceCtor: ServiceClientConstructor;
     protected instances: { [address: string]: ServiceClient<T>; } = {};
@@ -35,19 +41,15 @@ export class ServiceProxy<T extends object> {
     constructor(target: {
         package: string;
         service: ServiceClientConstructor;
-    }, protected servers: {
-        address: string;
-        credentials: ChannelCredentials,
-        options?: Partial<ChannelOptions> & { connectTimeout?: number; };
-    }[], protected routeResolver: ((ctx: {
-        servers: { address: string, state: connectivityState; }[];
+    }, protected servers: ServerConfig[], protected routeResolver: ((ctx: {
         package: string;
         service: ServiceClientConstructor;
+        servers: (ServerConfig & { state: connectivityState; })[];
         /**
          * The route params passed when calling the `getInstance()` function, we
          * can use this object to calculate the desired route address.
          */
-        params: any;
+        params: P | null;
         acc: number;
     }) => string) | null = null) {
         this.packageName = target.package;
@@ -58,17 +60,9 @@ export class ServiceProxy<T extends object> {
      * Dynamically add server configurations at runtime, this is useful when we 
      * need to implement some kind of service discovery strategy.
      */
-    addServer(
-        address: string,
-        credentials: ChannelCredentials,
-        options: Partial<ChannelOptions> & { connectTimeout?: number; } | undefined = void 0
-    ) {
-        if (!this.servers.some(item => item.address === address)) {
-            this.servers.push({
-                address,
-                credentials,
-                options,
-            });
+    addServer(server: ServerConfig) {
+        if (!this.servers.some(item => item.address === server.address)) {
+            this.servers.push(server);
             return true;
         } else {
             return false;
@@ -95,18 +89,18 @@ export class ServiceProxy<T extends object> {
      *  calculation, otherwise, it has no effect.
      * @returns 
      */
-    getInstance(routeParams: any = null): ServiceClient<T> {
+    getInstance(routeParams: P = null): ServiceClient<T> {
         let address: string;
 
         if (this.routeResolver) {
             address = this.routeResolver({
-                servers: this.servers.map(({ address }) => {
-                    const ins = this.instances[address];
+                servers: this.servers.map(config => {
+                    const ins = this.instances[config.address];
                     return {
-                        address,
+                        ...config,
                         state: ins
                             ? ins.getChannel().getConnectivityState(false)
-                            : connectivityState.IDLE
+                            : connectivityState.IDLE,
                     };
                 }),
                 package: this.packageName,
@@ -214,13 +208,13 @@ export class ConnectionManager {
      * @throws If the target service is not registered, a ReferenceError will be
      *  thrown.
      */
-    getInstanceOf<T extends object>(
+    getInstanceOf<T extends object, P extends any = any>(
         target: string | ServiceProxy<T>,
-        routeParams: any = null
+        routeParams: P = null
     ): ServiceClient<T> {
         const { packageName, serviceName } = this.destructPackageAndServiceNames(target);
         const name = packageName + "." + serviceName;
-        const proxy = this.registry.get(name);
+        const proxy = this.registry.get(name) as ServiceProxy<T, P>;
 
         if (proxy) {
             return proxy.getInstance(routeParams);

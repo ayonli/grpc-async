@@ -10,7 +10,8 @@ import {
     ServiceClient,
     unserve,
     ServiceProxy,
-    ConnectionManager
+    ConnectionManager,
+    ServiceProxyOf
 } from "../index";
 import { SERVER_ADDRESS, examples, Request, Response } from "../examples/traditional";
 import { Greeter } from "../examples/async";
@@ -348,7 +349,7 @@ describe("ServiceProxy", () => {
     });
 
     it("should balance the load via a custom route resolver", async () => {
-        const proxy = new ServiceProxy<Greeter>({
+        const proxy = new ServiceProxy<Greeter, Request>({
             package: "examples",
             service: examples.Greeter as ServiceClientConstructor
         }, addresses.map(address => ({
@@ -410,7 +411,7 @@ describe("ServiceProxy", () => {
             });
         });
 
-        proxy.addServer(address, credentials.createInsecure());
+        proxy.addServer({ address, credentials: credentials.createInsecure() });
 
         const result4 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result4, { message: "Hello, World" });
@@ -427,7 +428,7 @@ describe("ServiceProxy", () => {
         const manager = new ConnectionManager();
 
         it("should register proxy as expected", async () => {
-            const proxy = new ServiceProxy<Greeter>({
+            const proxy = new ServiceProxy<Greeter, Request>({
                 package: "examples",
                 service: examples.Greeter as ServiceClientConstructor
             }, addresses.map(address => ({
@@ -455,7 +456,7 @@ describe("ServiceProxy", () => {
             ok(manager.deregister(name));
             ok(!manager.deregister(proxy));
 
-            const [err2] = _try(() => manager.getInstanceOf(name));
+            const [err2] = _try(() => manager.getInstanceOf<Greeter>(name));
             strictEqual(String(err2), "ReferenceError: service examples.Greeter is not registered");
 
             manager.close();
@@ -471,7 +472,8 @@ describe("ServiceProxy", () => {
             })));
             manager.register(proxy);
 
-            const services = manager.useChainingSyntax();
+            // @ts-ignore
+            global["services"] = manager.useChainingSyntax();
 
             const ins = services.examples.Greeter() as ServiceClient<Greeter>;
             const result1 = await ins.SayHello({ name: "World" });
@@ -479,3 +481,9 @@ describe("ServiceProxy", () => {
         });
     });
 });
+
+declare global {
+    namespace services.examples {
+        const Greeter: ServiceProxyOf<Greeter, Request>;
+    }
+}
