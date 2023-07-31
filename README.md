@@ -411,53 +411,47 @@ export type ServiceClient<T extends object> = Omit<grpc.Client, "waitForReady"> 
 } & ClientMethods<T>;
 ```
 
-## Use ServiceProxy and ConnectionManager
+## LoadBalancer
 
 Other than using `connect()` to connect to a certain server, we can use
-`new ServiceProxy()` to connect to multiple servers at once and leverage calls with
-a programmatic client-side load balancer.
+`new LoadBalancer()` to connect to multiple servers at once and leverage calls
+with a programmatic client-side load balancer.
 
-Unlike the traditional load balancer which uses a
-DNS resolver that assumes our program runs on different machines, this new load
-balancer allows us to run the server in the same machine but in many
-process/instances. And we can programmatically control how our traffic is routed
-to different servers on demand.
+Unlike the traditional load balancer which uses a DNS resolver that assumes our
+program runs on different machines or virtual machines, this new load balancer
+allows us to run the server in the same machine but in many processes/instances,
+and we can programmatically control how our traffic is routed to different
+server instances on demand.
 
 ```ts
-import { ServiceProxy } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { LoadBalancer } from "."; // replace this with `@hyurl/grpc-async` in your code
 // ...
 
-// imagine we have three server instances run on the same server (localhost).
-const proxy = new ServiceProxy({
-    package: "examples", // same package name in the .proto file
-    service: examples.Greeter as ServiceClientConstructor,
-}, [
+// Imagine we have three server instances run on the same server (localhost).
+const balancer = new LoadBalancer(examples.Greeter as ServiceClientConstructor, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
     { address: "localhost:50053", credentials: credentials.createInsecure() }
 ]);
 
 (async () => {
-    // Be default, the proxy uses round-robin algorithm for routing, so
+    // Be default, the load balancer uses round-robin algorithm for routing, so
     // this call happens on the first server instance,
-    const reply1 = await proxy.getInstance().SayHello({ name: "World" });
+    const reply1 = await balancer.getInstance().SayHello({ name: "World" });
 
     // this call happens on the second server instance.
-    const reply2 = await proxy.getInstance().SayHello({ name: "World" });
+    const reply2 = await balancer.getInstance().SayHello({ name: "World" });
 
     // this call happens on the third server instance.
-    const reply3 = await proxy.getInstance().SayHello({ name: "World" });
+    const reply3 = await balancer.getInstance().SayHello({ name: "World" });
 
     // this call happens on the first server instance.
-    const reply4 = await proxy.getInstance().SayHello({ name: "World" });
+    const reply4 = await balancer.getInstance().SayHello({ name: "World" });
 })();
 
 // We can define the route resolver to achieve custom load balancing strategy.
 import hash from "string-hash"; // assuming this package exists
-const proxy2 = new ServiceProxy({
-    package: "examples", // same package name in the .proto file
-    service: examples.Greeter as ServiceClientConstructor,
-}, [
+const balancer2 = new LoadBalancer(examples.Greeter as ServiceClientConstructor, [
     { address: "localhost:50051", credentials: credentials.createInsecure() },
     { address: "localhost:50052", credentials: credentials.createInsecure() },
     { address: "localhost:50053", credentials: credentials.createInsecure() }
@@ -489,52 +483,30 @@ const proxy2 = new ServiceProxy({
     // These two calls will happen on the same server instance since they have
     // the same route param structure:
     const req1: Request = { name: "Mr. World" };
-    const reply1 = await proxy2.getInstance(req).SayHello(req);
+    const reply1 = await balancer2.getInstance(req).SayHello(req);
 
     const req2: Request = { name: "Mrs. World" };
-    const reply2 = await proxy2.getInstance(req).SayHello(req);
+    const reply2 = await balancer2.getInstance(req).SayHello(req);
 
     // This call happens on the first server since we explicitly set the server
     // address to use:
     const req3: Request = { name: "Mrs. World" };
-    const reply3 = await proxy2.getInstance("localhost:50051").SayHello(req);
+    const reply3 = await balancer2.getInstance("localhost:50051").SayHello(req);
 })();
 ```
 
-### ConnectionManager
+## ConnectionManager
 
 ConnectionManager provides a place to manage all clients and retrieve instances
 via a general approach.
 
-```ts
-import { ServiceProxy, ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
-// ...
-
-// imagine we have three server instances run on the same server (localhost).
-const proxy = new ServiceProxy({
-    package: "examples", // same package name in the .proto file
-    service: examples.Greeter as ServiceClientConstructor,
-}, [
-    { address: "localhost:50051", credentials: credentials.createInsecure() },
-    { address: "localhost:50052", credentials: credentials.createInsecure() },
-    { address: "localhost:50053", credentials: credentials.createInsecure() }
-]);
-
-const manager = new ConnectionManager();
-
-manager.register(proxy);
-
-// Instead of calling `proxy.getInstance()`, we do this:
-const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
-```
-
-A client or a proxy always binds a specific service client constructor and is
-a scoped variable, if we are going to access them across our program in different
-places, it would very painful and may cause recursive import problem.
+A client or a load balancer always binds a specific service client constructor
+and is a scoped variable, if we are going to use them across our program in
+different places, it would very painful and may cause recursive import problem.
 
 The connection manager, however, is a central place and a single variable, we
-can assign it to the global namespace and use it to retrieve service instance
-anywhere we want without worrying how to import it.
+can assign it to the global namespace and use it to retrieve service instances
+anywhere we want without worrying how to import them.
 
 For example:
 
@@ -549,7 +521,9 @@ declare global {
 // @ts-ignore
 const manager = global["services"] = new ConnectionManager();
 
-manager.register(proxy);
+manager.register(client);
+// Or
+manager.register(balancer);
 
 // and use it anywhere
 const ins = services.getInstanceOf<Greeter>("examples.Greeter");
@@ -573,7 +547,9 @@ declare global {
 
 const manager = new ConnectionManager();
 
-manager.register(proxy);
+manager.register(client);
+// Or
+manager.register(balancer);
 
 // @ts-ignore
 global["services"] = manager.useChainingSyntax();
@@ -582,7 +558,7 @@ global["services"] = manager.useChainingSyntax();
 const ins = services.examples.Greeter();
 ```
 
-For more information about the `ServiceProxy` and the `ConnectionManager`, please
-refer to the [source code](./proxy.ts) of their definition. They are the
+For more information about the `LoadBalancer` and the `ConnectionManager`, please
+refer to the [source code](./client.ts) of their definition. They are the
 enhancement part of this package that aims to provide straightforward usage of
-gRPC in a project with services system design.
+gRPC in a project with distributed system design.

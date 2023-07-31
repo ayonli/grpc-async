@@ -9,7 +9,7 @@ import {
     connect,
     ServiceClient,
     unserve,
-    ServiceProxy,
+    LoadBalancer,
     ConnectionManager,
     ServiceProxyOf
 } from "../index";
@@ -266,31 +266,32 @@ describe("go-server <=> node-client", () => {
     });
 });
 
-describe("ServiceProxy", () => {
-    const addresses = [
-        "localhost:50051",
-        "localhost:50052",
-        "localhost:50053"
-    ];
+const addresses = [
+    "localhost:50051",
+    "localhost:50052",
+    "localhost:50053"
+];
+
+class Greeter1 extends Greeter {
+    async SayHello({ name }: Request) {
+        return { message: "Hello, " + name + ". I'm server 1" } as Response;
+    }
+}
+
+class Greeter2 extends Greeter {
+    async SayHello({ name }: Request) {
+        return { message: "Hello, " + name + ". I'm server 2" } as Response;
+    }
+}
+
+class Greeter3 extends Greeter {
+    async SayHello({ name }: Request) {
+        return { message: "Hello, " + name + ". I'm server 3" } as Response;
+    }
+}
+
+describe("LoadBalancer", () => {
     let servers: Server[] = [];
-
-    class Greeter1 extends Greeter {
-        async SayHello({ name }: Request) {
-            return { message: "Hello, " + name + ". I'm server 1" } as Response;
-        }
-    }
-
-    class Greeter2 extends Greeter {
-        async SayHello({ name }: Request) {
-            return { message: "Hello, " + name + ". I'm server 2" } as Response;
-        }
-    }
-
-    class Greeter3 extends Greeter {
-        async SayHello({ name }: Request) {
-            return { message: "Hello, " + name + ". I'm server 3" } as Response;
-        }
-    }
 
     before(async () => {
         for (let i = 0; i < addresses.length; i++) {
@@ -328,72 +329,73 @@ describe("ServiceProxy", () => {
     });
 
     it("should balance the load as expected", async () => {
-        const proxy = new ServiceProxy<Greeter>({
-            package: "examples",
-            service: examples.Greeter as ServiceClientConstructor
-        }, addresses.map(address => ({
-            address,
-            credentials: credentials.createInsecure(),
-        })));
+        const balancer = new LoadBalancer<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            addresses.map(address => ({
+                address,
+                credentials: credentials.createInsecure(),
+            }))
+        );
 
-        const result1 = await proxy.getInstance().SayHello({ name: "World" });
+        const result1 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-        const result2 = await proxy.getInstance().SayHello({ name: "World" });
+        const result2 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-        const result3 = await proxy.getInstance().SayHello({ name: "World" });
+        const result3 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
-        proxy.close();
+        balancer.close();
     });
 
     it("should balance the load via a custom route resolver", async () => {
-        const proxy = new ServiceProxy<Greeter, Request>({
-            package: "examples",
-            service: examples.Greeter as ServiceClientConstructor
-        }, addresses.map(address => ({
-            address,
-            credentials: credentials.createInsecure(),
-        })), ({ servers, params }) => {
-            if (params?.name === "Mr. World") {
-                return servers[0].address;
-            } else {
-                return servers[1].address;
+        const balancer = new LoadBalancer<Greeter, Request>(
+            examples.Greeter as ServiceClientConstructor,
+            addresses.map(address => ({
+                address,
+                credentials: credentials.createInsecure(),
+            })),
+            ({ servers, params }) => {
+                if (params?.name === "Mr. World") {
+                    return servers[0].address;
+                } else {
+                    return servers[1].address;
+                }
             }
-        });
+        );
 
         const req1: Request = { name: "Mr. World" };
-        const result1 = await proxy.getInstance(req1).SayHello(req1);
+        const result1 = await balancer.getInstance(req1).SayHello(req1);
         deepStrictEqual(result1, { message: "Hello, Mr. World. I'm server 1" });
 
         const req2: Request = { name: "Mr. World" };
-        const result2 = await proxy.getInstance(req2).SayHello(req2);
+        const result2 = await balancer.getInstance(req2).SayHello(req2);
         deepStrictEqual(result2, { message: "Hello, Mr. World. I'm server 1" });
 
         const req3: Request = { name: "Mrs. World" };
-        const result3 = await proxy.getInstance(req3).SayHello(req3);
+        const result3 = await balancer.getInstance(req3).SayHello(req3);
         deepStrictEqual(result3, { message: "Hello, Mrs. World. I'm server 2" });
 
-        proxy.close();
+        balancer.close();
     });
 
     it("should dynamically add and remove server as expected", async () => {
-        const proxy = new ServiceProxy<Greeter>({
-            package: "examples",
-            service: examples.Greeter as ServiceClientConstructor
-        }, addresses.map(address => ({
-            address,
-            credentials: credentials.createInsecure(),
-        })));
+        const balancer = new LoadBalancer<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            addresses.map(address => ({
+                address,
+                credentials: credentials.createInsecure(),
+            }))
+        );
 
-        const result1 = await proxy.getInstance().SayHello({ name: "World" });
+        const result1 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-        const result2 = await proxy.getInstance().SayHello({ name: "World" });
+        const result2 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-        const result3 = await proxy.getInstance().SayHello({ name: "World" });
+        const result3 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
         const server = new Server();
@@ -411,74 +413,154 @@ describe("ServiceProxy", () => {
             });
         });
 
-        proxy.addServer({ address, credentials: credentials.createInsecure() });
+        balancer.addServer({ address, credentials: credentials.createInsecure() });
 
-        const result4 = await proxy.getInstance().SayHello({ name: "World" });
+        const result4 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result4, { message: "Hello, World" });
 
-        proxy.removeServer(address);
+        balancer.removeServer(address);
 
-        const result5 = await proxy.getInstance().SayHello({ name: "World" });
+        const result5 = await balancer.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result5, { message: "Hello, World. I'm server 2" });
 
-        proxy.close();
+        balancer.close();
+    });
+});
+
+describe("ConnectionManager", () => {
+    let servers: Server[] = [];
+
+    before(async () => {
+        for (let i = 0; i < addresses.length; i++) {
+            const addr = addresses[i];
+            const server = new Server();
+
+            if (i === 0) {
+                serve(server, examples.Greeter as ServiceClientConstructor, new Greeter1());
+            } else if (i === 1) {
+                serve(server, examples.Greeter as ServiceClientConstructor, new Greeter2());
+            } else if (i === 2) {
+                serve(server, examples.Greeter as ServiceClientConstructor, new Greeter3());
+            }
+
+            await new Promise<void>((resolve, reject) => {
+                server.bindAsync(addr, ServerCredentials.createInsecure(), (err) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        server.start();
+                        resolve();
+                    }
+                });
+            });
+
+            servers.push(server);
+        }
+
     });
 
-    describe("ConnectionManager", () => {
+    after(() => {
+        servers.forEach(server => {
+            server.forceShutdown();
+        });
+    });
+
+    it("should register a client as expected", async () => {
         const manager = new ConnectionManager();
+        const client = connect<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            SERVER_ADDRESS,
+            credentials.createInsecure());
 
-        it("should register proxy as expected", async () => {
-            const proxy = new ServiceProxy<Greeter, Request>({
-                package: "examples",
-                service: examples.Greeter as ServiceClientConstructor
-            }, addresses.map(address => ({
+        ok(manager.register(client));
+        ok(!manager.register(client));
+
+        const ins = manager.getInstanceOf(client);
+        const result1 = await ins?.SayHello({ name: "World" });
+        deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
+
+        const [err1] = _try(() => manager.getInstanceOf("foo.Greeter"));
+        strictEqual(String(err1), "ReferenceError: service foo.Greeter is not registered");
+
+        ok(manager.deregister("examples.Greeter"));
+        ok(!manager.deregister(client));
+
+        const [err2] = _try(() => manager.getInstanceOf<Greeter>("examples.Greeter"));
+        strictEqual(String(err2), "ReferenceError: service examples.Greeter is not registered");
+
+        manager.close();
+    });
+
+    it("should register a load balancer as expected", async () => {
+        const manager = new ConnectionManager();
+        const balancer = new LoadBalancer<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            addresses.map(address => ({
                 address,
                 credentials: credentials.createInsecure(),
-            })));
+            }))
+        );
 
-            ok(manager.register(proxy));
-            ok(!manager.register(proxy));
+        ok(manager.register(balancer));
+        ok(!manager.register(balancer));
 
-            const name = proxy.packageName + "." + proxy.serviceCtor.serviceName;
-            strictEqual(name, "examples.Greeter");
+        const ins1 = manager.getInstanceOf(balancer);
+        const result1 = await ins1?.SayHello({ name: "World" });
+        deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-            const ins1 = manager.getInstanceOf(proxy);
-            const result1 = await ins1?.SayHello({ name: "World" });
-            deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
+        const ins2 = manager.getInstanceOf<Greeter>("examples.Greeter");
+        const result2 = await ins2?.SayHello({ name: "World" });
+        deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-            const ins2 = manager.getInstanceOf<Greeter>(name);
-            const result2 = await ins2?.SayHello({ name: "World" });
-            deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
+        const [err1] = _try(() => manager.getInstanceOf("foo.Greeter"));
+        strictEqual(String(err1), "ReferenceError: service foo.Greeter is not registered");
 
-            const [err1] = _try(() => manager.getInstanceOf("foo.Greeter"));
-            strictEqual(String(err1), "ReferenceError: service foo.Greeter is not registered");
+        ok(manager.deregister("examples.Greeter"));
+        ok(!manager.deregister(balancer));
 
-            ok(manager.deregister(name));
-            ok(!manager.deregister(proxy));
+        const [err2] = _try(() => manager.getInstanceOf<Greeter>("examples.Greeter"));
+        strictEqual(String(err2), "ReferenceError: service examples.Greeter is not registered");
 
-            const [err2] = _try(() => manager.getInstanceOf<Greeter>(name));
-            strictEqual(String(err2), "ReferenceError: service examples.Greeter is not registered");
+        manager.close();
+    });
 
-            manager.close();
-        });
+    it("should use chaining syntax for the client", async () => {
+        const manager = new ConnectionManager();
+        const client = connect<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            SERVER_ADDRESS,
+            credentials.createInsecure());
+        manager.register(client);
 
-        it("should use chaining syntax as expected", async () => {
-            const proxy = new ServiceProxy<Greeter>({
-                package: "examples",
-                service: examples.Greeter as ServiceClientConstructor
-            }, addresses.map(address => ({
+        // @ts-ignore
+        global["services"] = manager.useChainingSyntax();
+
+        const ins = services.examples.Greeter();
+        const result1 = await ins.SayHello({ name: "World" });
+        deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
+
+        manager.close();
+    });
+
+    it("should use chaining syntax for the load balancer", async () => {
+        const manager = new ConnectionManager();
+        const balancer = new LoadBalancer<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            addresses.map(address => ({
                 address,
                 credentials: credentials.createInsecure(),
-            })));
-            manager.register(proxy);
+            }))
+        );
+        manager.register(balancer);
 
-            // @ts-ignore
-            global["services"] = manager.useChainingSyntax();
+        // @ts-ignore
+        global["services"] = manager.useChainingSyntax();
 
-            const ins = services.examples.Greeter() as ServiceClient<Greeter>;
-            const result1 = await ins.SayHello({ name: "World" });
-            deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
-        });
+        const ins = services.examples.Greeter({ name: "World" });
+        const result1 = await ins.SayHello({ name: "World" });
+        deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
+
+        manager.close();
     });
 });
 

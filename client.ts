@@ -6,9 +6,11 @@ import {
     ClientReadableStream as gClientReadableStream,
     ClientDuplexStream as gClientDuplexStream,
     ServiceClientConstructor,
-    Metadata
+    Metadata,
+    connectivityState
 } from "@grpc/grpc-js";
 import { ServerReadableStream, ServerDuplexStream } from "./server";
+import { applyMagic } from "js-magic";
 
 const NodeVersion = parseInt(process.version.slice(1));
 
@@ -224,4 +226,318 @@ export function connect<T extends object>(
     }
 
     return ins as any as ServiceClient<T>;
+}
+
+export type ServerConfig = {
+    address: string;
+    credentials: ChannelCredentials,
+    options?: Partial<ChannelOptions> & { connectTimeout?: number; };
+};
+
+/**
+ * ServiceProxy gives the ability to connect to multiple servers and implement
+ * custom client-side load balancing algorithms.
+ */
+export class LoadBalancer<T extends object, P extends any = any> {
+    protected instances: { [address: string]: ServiceClient<T>; } = {};
+    protected acc = 0;
+
+    /**
+     * 
+     * @param target 
+     * @param servers The server configurations used to create service client.
+     * @param routeResolver Custom route resolver used to implement load
+     *  balancing algorithms, if not provided, a default round-robin algorithm
+     *  is used. The function takes a context object and returns an address
+     *  filtered from the `ctx.servers`.
+     */
+    constructor(
+        readonly service: ServiceClientConstructor,
+        protected servers: ServerConfig[],
+        protected routeResolver: ((ctx: {
+            service: ServiceClientConstructor;
+            servers: (ServerConfig & { state: connectivityState; })[];
+            /**
+             * The route params passed when calling the `getInstance()` function, we
+             * can use this object to calculate the desired route address.
+             */
+            params: P | null;
+            acc: number;
+        }) => string) | null = null
+    ) { }
+
+    /**
+     * Dynamically add server configurations at runtime, this is useful when we 
+     * need to implement some kind of service discovery strategy.
+     */
+    addServer(server: ServerConfig) {
+        if (!this.servers.some(item => item.address === server.address)) {
+            this.servers.push(server);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Dynamically remove server configurations at runtime, this is useful when we 
+     * need to implement some kind of service discovery strategy.
+     */
+    removeServer(address: string) {
+        if (this.servers.some(item => item.address === address)) {
+            this.servers = this.servers.filter(item => item.address !== address);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Retrieves an instance of the service client.
+     * @param routeParams If a custom `routeResolver` is provided when initiating
+     *  the load balancer, this argument will be passed to the function for route
+     *  calculation, otherwise, it has no effect.
+     * @returns 
+     */
+    getInstance(routeParams: P = null): ServiceClient<T> {
+        let address: string;
+
+        if (this.routeResolver) {
+            address = this.routeResolver({
+                service: this.service,
+                servers: this.servers.map(config => {
+                    const ins = this.instances[config.address];
+                    return {
+                        ...config,
+                        state: ins
+                            ? ins.getChannel().getConnectivityState(false)
+                            : connectivityState.IDLE,
+                    };
+                }),
+                params: routeParams,
+                acc: this.acc,
+            });
+            this.acc++;
+        } else {
+            const addresses = this.servers.map(config => config.address)
+                .filter(address => {
+                    const ins = this.instances[address];
+
+                    if (ins) {
+                        const state = ins.getChannel().getConnectivityState(false);
+                        return state !== connectivityState.SHUTDOWN
+                            && state !== connectivityState.TRANSIENT_FAILURE;
+                    } else {
+                        return true;
+                    }
+                });
+            address = addresses[this.acc++ % addresses.length];
+        }
+
+        if (this.acc > Number.MAX_SAFE_INTEGER) {
+            this.acc = 0;
+        }
+
+        if (!address) {
+            throw new Error("No server address is available");
+        }
+
+        let ins = this.instances[address];
+
+        if (!ins) {
+            const config = this.servers.find(config => config.address === address);
+
+            if (!config) {
+                throw new Error("The resolve server address is invalid");
+            }
+
+            ins = connect(this.service, config.address, config.credentials, config.options);
+            this.instances[address] = ins;
+        }
+
+        return ins;
+    }
+
+    /** Closes all the connection. */
+    close() {
+        Object.values(this.instances).forEach(ins => {
+            ins.close();
+        });
+    }
+}
+
+
+export interface ServiceProxyOf<T extends object, P extends any = any> {
+    (): ServiceClient<T>;
+    (routeParams: P): ServiceClient<T>;
+};
+
+export type ChainingProxyInterface = ServiceProxyOf<any, any> & {
+    [nsp: string]: ChainingProxyInterface;
+};
+
+/**
+ * ConnectionManager provides a place to manage all service proxies and retrieve
+ * instances via a general approach.
+ */
+export class ConnectionManager {
+    protected registry = new Map<string, ServiceClient<any> | LoadBalancer<any>>();
+
+    register(target: ServiceClient<any> | LoadBalancer<any>) {
+        let name: string;
+
+        if (target instanceof LoadBalancer) {
+            name = this.getServiceFullName(target.service);
+        } else {
+            const ctor = target.constructor as ServiceClientConstructor;
+            name = this.getServiceFullName(ctor);
+        }
+
+        if (this.registry.has(name)) {
+            return false;
+        } else {
+            this.registry.set(name, target);
+            return true;
+        }
+    }
+
+    /**
+     * 
+     * @param target If the target is a string, it is the full name of the
+     *  service (includes the package name, concatenated with `.`).
+     * @returns 
+     */
+    deregister(target: string | ServiceClient<any> | LoadBalancer<any>, closeConnection = false) {
+        const name = this.unpackServiceFullName(target);
+
+        if (closeConnection) {
+            const balancer = this.registry.get(name);
+
+            if (balancer) {
+                balancer.close();
+            } else {
+                return false;
+            }
+        }
+
+        return this.registry.delete(name);
+    }
+
+    /**
+     * 
+     * @param target If the target is a string, it is the full name of the
+     *  service (includes the package name, concatenated with `.`).
+     * @param routeParams If a custom `routeResolver` is provided when initiating
+     *  the load balancer, this argument will be passed to the function for route
+     *  calculation, otherwise, it has no effect.
+     * @throws If the target service is not registered, a ReferenceError will be
+     *  thrown.
+     */
+    getInstanceOf<T extends object>(
+        target: string | ServiceClient<T> | LoadBalancer<T>
+    ): ServiceClient<T>;
+    getInstanceOf<T extends object, P extends any = any>(
+        target: string | ServiceClient<T> | LoadBalancer<T>,
+        routeParams: P
+    ): ServiceClient<T>;
+    getInstanceOf<T extends object, P extends any = any>(
+        target: string | ServiceClient<T> | LoadBalancer<T>,
+        routeParams: P = null
+    ): ServiceClient<T> {
+        const name = this.unpackServiceFullName(target);
+        const client = this.registry.get(name);
+
+        if (client) {
+            if (client instanceof LoadBalancer) {
+                return client.getInstance(routeParams);
+            } else {
+                return client;
+            }
+        } else {
+            throw new ReferenceError(`service ${name} is not registered`);
+        }
+    }
+
+    private getServiceFullName(ctor: ServiceClientConstructor) {
+        const { service } = ctor;
+        const firstMethod = Object.getOwnPropertyNames(service)[0];
+        const { path } = service[firstMethod];
+        return path.split("/")[1];
+    }
+
+    private unpackServiceFullName(target: string | ServiceClient<any> | LoadBalancer<any>) {
+        if (typeof target === "string") {
+            return target;
+        } else if (target instanceof LoadBalancer) {
+            return this.getServiceFullName(target.service);
+        } else {
+            const ctor = target.constructor as ServiceClientConstructor;
+            return this.getServiceFullName(ctor);
+        }
+    }
+
+    /**
+     * Closes all the connections of all proxies.
+     */
+    close() {
+        this.registry.forEach(balancer => {
+            balancer.close();
+        });
+    }
+
+    /**
+     * Instead of calling `#getInstanceOf()` to retrieve the service client,
+     * this function allows us to use chaining syntax to dynamically generated
+     * namespaces and client constructors that can be used as a syntax sugar.
+     * @example
+     *  // Instead of this:
+     *  const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
+     * 
+     *  // We do this:
+     *  const services = manager.useChainingSyntax();
+     *  const ins = services.examples.Greeter();
+     */
+    useChainingSyntax() {
+        return new ChainingProxy("", this) as any as ChainingProxyInterface;
+    }
+}
+
+@applyMagic
+class ChainingProxy {
+    protected __target: string;
+    protected __manager: ConnectionManager;
+    protected __children: { [prop: string]: ChainingProxy; } = {};
+
+    constructor(target: string, manager: ConnectionManager) {
+        this.__target = target;
+        this.__manager = manager;
+    }
+
+    protected __get(prop: string | symbol) {
+        if (prop in this) {
+            return this[prop];
+        } else if (prop in this.__children) {
+            return this.__children[String(prop)];
+        } else if (typeof prop !== "symbol") {
+            return (this.__children[prop] = createChainingProxy(
+                (this.__target ? this.__target + "." : "") + String(prop),
+                this.__manager
+            ));
+        }
+    }
+
+    protected __has(prop: string | symbol) {
+        return (prop in this) || (prop in this.__children);
+    }
+}
+
+function createChainingProxy(target: string, manager: ConnectionManager) {
+    const chain: ChainingProxy = function (routeParams: any = null) {
+        return manager.getInstanceOf(target, routeParams);
+    } as any;
+
+    Object.setPrototypeOf(chain, ChainingProxy.prototype);
+    Object.assign(chain, { __target: target, __manager: manager, __children: {} });
+
+    return applyMagic(chain as any, true);
 }
