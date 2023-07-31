@@ -5,7 +5,8 @@ import {
     ClientWritableStream as gClientWritableStream,
     ClientReadableStream as gClientReadableStream,
     ClientDuplexStream as gClientDuplexStream,
-    ServiceClientConstructor
+    ServiceClientConstructor,
+    Metadata
 } from "@grpc/grpc-js";
 import { ServerReadableStream, ServerDuplexStream } from "./server";
 
@@ -19,13 +20,19 @@ export type ClientReadableStream<Res> = gClientReadableStream<Res> & AsyncIterab
 
 export type ClientDuplexStream<Req, Res> = gClientDuplexStream<Req, Res> & AsyncIterable<Res>;
 
+export type UnaryFunction<Req, Res> = (req: Req, metadata?: Metadata) => Promise<Res>;
+
+export type StreamResponseFunction<Req, Res> = (req: Req, metadata?: Metadata) => AsyncGenerator<Res, void, unknown>;
+
 export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
 
 export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
 
 export type ClientMethods<T extends object> = {
-    [K in keyof T]: T[K] extends StreamRequestFunction<infer Req, infer Res> ? () => ClientWritableStream<Req, Res>
-    : T[K] extends DuplexFunction<infer Req, infer Res> ? () => ClientDuplexStream<Req, Res>
+    [K in keyof T]: T[K] extends DuplexFunction<infer Req, infer Res> ? (metadata?: Metadata) => ClientDuplexStream<Req, Res>
+    : T[K] extends StreamRequestFunction<infer Req, infer Res> ? (metadata?: Metadata) => ClientWritableStream<Req, Res>
+    : T[K] extends StreamResponseFunction<infer Req, infer Res> ? (req: Req, metadata?: Metadata) => AsyncGenerator<Res, void, unknown>
+    : T[K] extends UnaryFunction<infer Req, infer Res> ? (req: Req, metadata?: Metadata) => Promise<Res>
     : T[K];
 };
 
@@ -58,12 +65,16 @@ export function connect<T extends object>(
         }
     };
 
-    Object.assign(ins, { waitForReady });
+    Object.defineProperty(ins, "waitForReady", {
+        configurable: true,
+        writable: true,
+        enumerable: false,
+        value: waitForReady,
+    });
 
     for (const name of Object.getOwnPropertyNames(service.service)) {
         const def = service.service[name];
-        const fnName = def.originalName || name;
-        const originalFn = ins[fnName]?.bind(ins);
+        const originalFn = ins[name]?.bind(ins);
         let newFn: (data?: any) => any = null as any;
 
         if (!originalFn)
@@ -71,8 +82,8 @@ export function connect<T extends object>(
 
         if (def.requestStream) {
             if (def.responseStream) {
-                newFn = function () {
-                    const call: gClientDuplexStream<any, any> = originalFn();
+                newFn = function (metadata: Metadata | undefined = void 0) {
+                    const call: gClientDuplexStream<any, any> = originalFn(metadata);
                     const originalIteratorFn = call[Symbol.asyncIterator].bind(call);
 
                     call[Symbol.asyncIterator] = async function* () {
@@ -110,7 +121,7 @@ export function connect<T extends object>(
                     return call;
                 };
             } else {
-                newFn = function () {
+                newFn = function (metadata: Metadata | undefined = void 0) {
                     let task: {
                         resolve: (reply: any) => void,
                         reject: (err: unknown) => void;
@@ -120,13 +131,26 @@ export function connect<T extends object>(
                         reply: any;
                     } = null as any;
 
-                    const call: gClientWritableStream<any> = originalFn((err: unknown, reply: any) => {
-                        if (task) {
-                            err ? task.reject(err) : task.resolve(reply);
-                        } else {
-                            result = { err, reply };
-                        }
-                    });
+                    let call: gClientWritableStream<any>;
+
+                    if (metadata) {
+                        call = originalFn(metadata, (err: unknown, reply: any) => {
+                            if (task) {
+                                err ? task.reject(err) : task.resolve(reply);
+                            } else {
+                                result = { err, reply };
+                            }
+                        });
+                    } else {
+                        call = originalFn((err: unknown, reply: any) => {
+                            if (task) {
+                                err ? task.reject(err) : task.resolve(reply);
+                            } else {
+                                result = { err, reply };
+                            }
+                        });
+                    }
+
                     call["returns"] = () => {
                         return new Promise<any>((resolve, reject) => {
                             if (!call.closed && !call.destroyed) {
@@ -145,41 +169,58 @@ export function connect<T extends object>(
                 };
             }
         } else if (def.responseStream) {
-            newFn = async function* (data: any) {
+            newFn = async function* (data: any, metadata: Metadata | undefined = void 0) {
                 await waitForReady();
-                const call: gClientReadableStream<any> = originalFn(data);
+                const call: gClientReadableStream<any> = originalFn(data, metadata);
 
                 for await (const value of call) {
                     yield value;
                 }
             } as AsyncGeneratorFunction;
         } else {
-            newFn = (data: any, callback?: (err: unknown, reply: any) => void) => {
-                if (callback) {
-                    waitForReady(void 0, (err) => {
-                        if (err) {
-                            callback(err, void 0);
-                        } else {
-                            originalFn.call(ins, data, callback);
-                        }
-                    });
-                } else {
-                    return new Promise((resolve, reject) => {
-                        Promise.resolve(waitForReady()).then(() => {
-                            originalFn.call(ins, data, (err: unknown, res: any) => {
+            newFn = (data: any, metadata: Metadata | undefined = void 0) => {
+                return new Promise((resolve, reject) => {
+                    Promise.resolve(waitForReady()).then(() => {
+                        if (metadata) {
+                            originalFn(data, metadata, (err: unknown, res: any) => {
                                 if (err) {
                                     reject(err);
                                 } else {
                                     resolve(res);
                                 }
                             });
-                        }).catch(reject);
-                    });
-                }
+                        } else {
+                            originalFn(data, (err: unknown, res: any) => {
+                                if (err) {
+                                    reject(err);
+                                } else {
+                                    resolve(res);
+                                }
+                            });
+                        }
+                    }).catch(reject);
+                });
             };
         }
 
-        ins[fnName] = newFn ?? originalFn;
+        if (newFn) {
+            Object.defineProperty(newFn, "name", {
+                configurable: true,
+                writable: false,
+                enumerable: false,
+                value: name,
+            });
+            ins[name] = newFn;
+
+            if (def.originalName) {
+                Object.defineProperty(ins, def.originalName, {
+                    configurable: true,
+                    writable: true,
+                    enumerable: false,
+                    value: newFn,
+                });
+            }
+        }
     }
 
     return ins as any as ServiceClient<T>;

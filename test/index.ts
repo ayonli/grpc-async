@@ -3,7 +3,7 @@ import { execSync } from "child_process";
 import { type ChildProcess, spawn } from "child_process";
 import { unlinkSync } from "fs";
 import { after, before, describe, it } from "mocha";
-import { Server, ServerCredentials, credentials, ServiceClientConstructor } from "@grpc/grpc-js";
+import { Server, ServerCredentials, credentials, ServiceClientConstructor, Metadata } from "@grpc/grpc-js";
 import {
     serve,
     connect,
@@ -42,15 +42,22 @@ describe("node-server <=> node-client", () => {
     });
 
     it("should call the async function as expected", async () => {
-        const result = await client.sayHello({ name: "World" });
-
+        const result = await client.SayHello({ name: "World" });
         deepStrictEqual(result, { message: "Hello, World" });
+    });
+
+    it("should call the async function with metadata", async () => {
+        const metadata = new Metadata();
+        metadata.set("foo", "bar");
+
+        const result = await client.SayHello({ name: "World" }, metadata);
+        deepStrictEqual(result, { message: "Hello, World with { foo: bar }" });
     });
 
     it("should call the async generator function as expected", async () => {
         const results: Response[] = [];
 
-        for await (const result of client.sayHelloStreamReply({ name: "World" })) {
+        for await (const result of client.SayHelloStreamReply({ name: "World" })) {
             results.push(result);
         }
 
@@ -61,19 +68,47 @@ describe("node-server <=> node-client", () => {
         ]);
     });
 
+    it("should call the async generator function with metadata", async () => {
+        const results: Response[] = [];
+        const metadata = new Metadata();
+        metadata.set("foo", "bar");
+
+        for await (const result of client.SayHelloStreamReply({ name: "World" }, metadata)) {
+            results.push(result);
+        }
+
+        deepStrictEqual(results, [
+            { message: "Hello 1: World with { foo: bar }" },
+            { message: "Hello 2: World with { foo: bar }" },
+            { message: "Hello 3: World with { foo: bar }" }
+        ]);
+    });
+
     it("should make stream requests as expected", async () => {
-        const call = client.sayHelloStreamRequest();
+        const call = client.SayHelloStreamRequest();
 
         call.write({ name: "Mr. World" });
         call.write({ name: "Mrs. World" });
 
         const result = await call.returns();
-
         deepStrictEqual(result, { message: "Hello, Mr. World, Mrs. World" });
     });
 
+    it("should make stream requests with metadata", async () => {
+        const metadata = new Metadata();
+        metadata.set("foo", "bar");
+
+        const call = client.SayHelloStreamRequest(metadata);
+
+        call.write({ name: "Mr. World" });
+        call.write({ name: "Mrs. World" });
+
+        const result = await call.returns();
+        deepStrictEqual(result, { message: "Hello, Mr. World, Mrs. World with { foo: bar }" });
+    });
+
     it("should make stream requests and receive stream responses as expected", async () => {
-        const call = client.sayHelloDuplex();
+        const call = client.SayHelloDuplex();
 
         call.write({ name: "Mr. World" });
         call.write({ name: "Mrs. World" });
@@ -94,9 +129,33 @@ describe("node-server <=> node-client", () => {
         ]);
     });
 
+    it("should make stream requests and receive stream responses with metadata", async () => {
+        const metadata = new Metadata();
+        metadata.set("foo", "bar");
+        const call = client.SayHelloDuplex(metadata);
+
+        call.write({ name: "Mr. World" });
+        call.write({ name: "Mrs. World" });
+
+        const results: Response[] = [];
+
+        for await (const reply of call) {
+            results.push(reply);
+
+            if (results.length === 2) {
+                call.end();
+            }
+        }
+
+        deepStrictEqual(results, [
+            { message: "Hello, Mr. World with { foo: bar }" },
+            { message: "Hello, Mrs. World with { foo: bar }" }
+        ]);
+    });
+
     describe("reload service", () => {
         class NewGreeter extends Greeter {
-            async sayHello({ name }: Request): Promise<Response> {
+            async SayHello({ name }: Request): Promise<Response> {
                 return { message: "Hi, " + name };
             }
         }
@@ -112,7 +171,7 @@ describe("node-server <=> node-client", () => {
         });
 
         it("should call the new function as expected", async () => {
-            const result = await client.sayHello({ name: "World" });
+            const result = await client.SayHello({ name: "World" });
 
             deepStrictEqual(result, { message: "Hi, World" });
         });
@@ -153,7 +212,7 @@ describe("go-server <=> node-client", () => {
 
     it("should call the async function as expected", async function () {
         this.timeout(5000);
-        const result = await client.sayHello({ name: "World" });
+        const result = await client.SayHello({ name: "World" });
         deepStrictEqual(result, { message: "Hello, World" });
     });
 
@@ -161,7 +220,7 @@ describe("go-server <=> node-client", () => {
         this.timeout(5000);
         const results: Response[] = [];
 
-        for await (const result of client.sayHelloStreamReply({ name: "World" })) {
+        for await (const result of client.SayHelloStreamReply({ name: "World" })) {
             results.push(result);
         }
 
@@ -173,7 +232,7 @@ describe("go-server <=> node-client", () => {
     });
 
     it("should make stream requests as expected", async () => {
-        const call = client.sayHelloStreamRequest();
+        const call = client.SayHelloStreamRequest();
 
         call.write({ name: "Mr. World" });
         call.write({ name: "Mrs. World" });
@@ -184,7 +243,7 @@ describe("go-server <=> node-client", () => {
     });
 
     it("should make stream requests and receive stream responses as expected", async () => {
-        const call = client.sayHelloDuplex();
+        const call = client.SayHelloDuplex();
 
         call.write({ name: "Mr. World" });
         call.write({ name: "Mrs. World" });
@@ -215,19 +274,19 @@ describe("ServiceProxy", () => {
     let servers: Server[] = [];
 
     class Greeter1 extends Greeter {
-        async sayHello({ name }: Request) {
+        async SayHello({ name }: Request) {
             return { message: "Hello, " + name + ". I'm server 1" } as Response;
         }
     }
 
     class Greeter2 extends Greeter {
-        async sayHello({ name }: Request) {
+        async SayHello({ name }: Request) {
             return { message: "Hello, " + name + ". I'm server 2" } as Response;
         }
     }
 
     class Greeter3 extends Greeter {
-        async sayHello({ name }: Request) {
+        async SayHello({ name }: Request) {
             return { message: "Hello, " + name + ". I'm server 3" } as Response;
         }
     }
@@ -276,13 +335,13 @@ describe("ServiceProxy", () => {
             credentials: credentials.createInsecure(),
         })));
 
-        const result1 = await proxy.getInstance().sayHello({ name: "World" });
+        const result1 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-        const result2 = await proxy.getInstance().sayHello({ name: "World" });
+        const result2 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-        const result3 = await proxy.getInstance().sayHello({ name: "World" });
+        const result3 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
         proxy.close();
@@ -304,15 +363,15 @@ describe("ServiceProxy", () => {
         });
 
         const req1: Request = { name: "Mr. World" };
-        const result1 = await proxy.getInstance(req1).sayHello(req1);
+        const result1 = await proxy.getInstance(req1).SayHello(req1);
         deepStrictEqual(result1, { message: "Hello, Mr. World. I'm server 1" });
 
         const req2: Request = { name: "Mr. World" };
-        const result2 = await proxy.getInstance(req2).sayHello(req2);
+        const result2 = await proxy.getInstance(req2).SayHello(req2);
         deepStrictEqual(result2, { message: "Hello, Mr. World. I'm server 1" });
 
         const req3: Request = { name: "Mrs. World" };
-        const result3 = await proxy.getInstance(req3).sayHello(req3);
+        const result3 = await proxy.getInstance(req3).SayHello(req3);
         deepStrictEqual(result3, { message: "Hello, Mrs. World. I'm server 2" });
 
         proxy.close();
@@ -327,13 +386,13 @@ describe("ServiceProxy", () => {
             credentials: credentials.createInsecure(),
         })));
 
-        const result1 = await proxy.getInstance().sayHello({ name: "World" });
+        const result1 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
-        const result2 = await proxy.getInstance().sayHello({ name: "World" });
+        const result2 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
-        const result3 = await proxy.getInstance().sayHello({ name: "World" });
+        const result3 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result3, { message: "Hello, World. I'm server 3" });
 
         const server = new Server();
@@ -353,12 +412,12 @@ describe("ServiceProxy", () => {
 
         proxy.addServer(address, credentials.createInsecure());
 
-        const result4 = await proxy.getInstance().sayHello({ name: "World" });
+        const result4 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result4, { message: "Hello, World" });
 
         proxy.removeServer(address);
 
-        const result5 = await proxy.getInstance().sayHello({ name: "World" });
+        const result5 = await proxy.getInstance().SayHello({ name: "World" });
         deepStrictEqual(result5, { message: "Hello, World. I'm server 2" });
 
         proxy.close();
@@ -383,11 +442,11 @@ describe("ServiceProxy", () => {
             strictEqual(name, "examples.Greeter");
 
             const ins1 = manager.getInstanceOf(proxy);
-            const result1 = await ins1?.sayHello({ name: "World" });
+            const result1 = await ins1?.SayHello({ name: "World" });
             deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
 
             const ins2 = manager.getInstanceOf<Greeter>(name);
-            const result2 = await ins2?.sayHello({ name: "World" });
+            const result2 = await ins2?.SayHello({ name: "World" });
             deepStrictEqual(result2, { message: "Hello, World. I'm server 2" });
 
             const [err1] = _try(() => manager.getInstanceOf("foo.Greeter"));
@@ -415,7 +474,7 @@ describe("ServiceProxy", () => {
             const services = manager.useChainingSyntax();
 
             const ins = services.examples.Greeter() as ServiceClient<Greeter>;
-            const result1 = await ins.sayHello({ name: "World" });
+            const result1 = await ins.SayHello({ name: "World" });
             deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
         });
     });

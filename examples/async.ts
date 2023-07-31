@@ -1,4 +1,4 @@
-import { Server, ServerCredentials, credentials, ServiceClientConstructor } from "@grpc/grpc-js";
+import { Server, ServerCredentials, credentials, ServiceClientConstructor, Metadata } from "@grpc/grpc-js";
 import {
     serve,
     connect,
@@ -8,29 +8,39 @@ import {
 import { SERVER_ADDRESS, examples, Request, Response } from "./traditional";
 
 export class Greeter {
-    async sayHello({ name }: Request) {
-        return { message: "Hello, " + name } as Response;
+    async SayHello({ name }: Request, metadata: Metadata | undefined = void 0) {
+        if (metadata && String(metadata.get("foo"))) { // metadata.get() return empty array if the key doesn't exist
+            return { message: `Hello, ${name} with { foo: ${metadata.get("foo")} }` } as Response;
+        } else {
+            return { message: "Hello, " + name } as Response;
+        }
     }
 
-    async *sayHelloStreamReply({ name }: Request) {
-        yield { message: `Hello 1: ${name}` } as Response;
-        yield { message: `Hello 2: ${name}` } as Response;
-        yield { message: `Hello 3: ${name}` } as Response;
+    async *SayHelloStreamReply({ name }: Request, metadata: Metadata | undefined = void 0) {
+        if (metadata && String(metadata.get("foo"))) {
+            yield { message: `Hello 1: ${name} with { foo: ${metadata.get("foo")} }` } as Response;
+            yield { message: `Hello 2: ${name} with { foo: ${metadata.get("foo")} }` } as Response;
+            yield { message: `Hello 3: ${name} with { foo: ${metadata.get("foo")} }` } as Response;
+        } else {
+            yield { message: `Hello 1: ${name}` } as Response;
+            yield { message: `Hello 2: ${name}` } as Response;
+            yield { message: `Hello 3: ${name}` } as Response;
+        }
     }
 
-    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
+    async SayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
         const names: string[] = [];
 
         for await (const { name } of stream) {
             names.push(name);
         }
 
-        return await this.sayHello({ name: names.join(", ") });
+        return await this.SayHello({ name: names.join(", ") }, stream.metadata);
     }
 
-    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+    async *SayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
         for await (const { name } of stream) {
-            yield await this.sayHello({ name });
+            yield await this.SayHello({ name }, stream.metadata);
         }
     }
 }
@@ -54,12 +64,12 @@ if (require.main?.filename === __filename) {
     const jobs: Promise<void>[] = [];
 
     jobs.push((async () => {
-        const reply = await client.sayHello({ name: "World" });
+        const reply = await client.SayHello({ name: "World" });
         console.log(reply); // { message: "Hello, World" }
     })());
 
     jobs.push((async () => {
-        for await (const reply of client.sayHelloStreamReply({ name: "World" })) {
+        for await (const reply of client.SayHelloStreamReply({ name: "World" })) {
             console.log(reply);
             // { message: "Hello 1: World" }
             // { message: "Hello 2: World" }
@@ -68,7 +78,7 @@ if (require.main?.filename === __filename) {
     })());
 
     jobs.push((async () => {
-        const streamRequestCall = client.sayHelloStreamRequest();
+        const streamRequestCall = client.SayHelloStreamRequest();
         streamRequestCall.write({ name: "Mr. World" });
         streamRequestCall.write({ name: "Mrs. World" });
         const reply1 = await streamRequestCall.returns();
@@ -76,7 +86,7 @@ if (require.main?.filename === __filename) {
     })());
 
     jobs.push((async () => {
-        const duplexCall = client.sayHelloDuplex();
+        const duplexCall = client.SayHelloDuplex();
         let counter = 0;
         duplexCall.write({ name: "Mr. World" });
         duplexCall.write({ name: "Mrs. World" });

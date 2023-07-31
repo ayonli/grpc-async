@@ -6,7 +6,8 @@ import type {
     ServerReadableStream as gServerReadableStream,
     ServerDuplexStream as gServerDuplexStream,
     ServiceClientConstructor,
-    ServiceDefinition
+    ServiceDefinition,
+    Metadata
 } from "@grpc/grpc-js";
 
 const AsyncGeneratorFunction = (async function* () { }).constructor;
@@ -34,16 +35,13 @@ export function serve<T extends object>(
 
     for (const name of Object.getOwnPropertyNames(_service)) {
         const def: MethodDefinition<any, any> = _service[name];
-        let originalFn: (data?: any) => any = null as any;
+        let originalFn: (data?: any, metadata?: Metadata) => any = null as any;
         let newFn: (call: any, callback?: (err: unknown, result: any) => void) => void = null as any;
-        let fnName: string;
 
-        if (def.originalName) {
+        if (def.originalName && instance[def.originalName]) {
             originalFn = (instance[def.originalName] as Function)?.bind(instance) as any;
-            fnName = def.originalName;
         } else {
             originalFn = (instance[name] as Function)?.bind(instance) as any;
-            fnName = name;
         }
 
         if (!originalFn)
@@ -63,7 +61,7 @@ export function serve<T extends object>(
                 };
             } else if (isGenFn) {
                 newFn = async (stream: gServerWritableStream<any, any>) => {
-                    for await (const value of originalFn(stream.request)) {
+                    for await (const value of originalFn(stream.request, stream.metadata)) {
                         stream.write(value);
                     }
 
@@ -71,22 +69,33 @@ export function serve<T extends object>(
                 };
             }
         } else if (def.requestStream) {
-            if (originalFn.length === 1) {
-                newFn = (stream: gServerReadableStream<any, any>, callback) => {
-                    Promise.resolve(originalFn(stream))
-                        .then(result => callback!(null, result))
-                        .catch(err => callback!(err, void 0));
-                };
-            }
-        } else if (originalFn.length === 1) {
+            newFn = (stream: gServerReadableStream<any, any>, callback) => {
+                Promise.resolve(originalFn(stream))
+                    .then(result => callback!(null, result))
+                    .catch(err => callback!(err, void 0));
+            };
+        } else {
             newFn = (call: ServerUnaryCall<any, any>, callback) => {
-                Promise.resolve(originalFn(call.request))
+                Promise.resolve(originalFn(call.request, call.metadata))
                     .then(result => callback!(null, result))
                     .catch(err => callback!(err, void 0));
             };
         }
 
-        implementations[fnName] = newFn ?? originalFn;
+        if (newFn) {
+            Object.defineProperty(newFn, "name", {
+                configurable: true,
+                writable: false,
+                enumerable: false,
+                value: name,
+            });
+
+            if (def.originalName && instance[def.originalName]) {
+                implementations[def.originalName] = newFn;
+            } else {
+                implementations[name] = newFn;
+            }
+        }
     }
 
     server.addService(_service, implementations);

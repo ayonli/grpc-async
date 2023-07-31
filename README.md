@@ -77,21 +77,21 @@ type Response = {
 // ==== server ====
 const server = new Server();
 server.addService(Greeter.service, {
-    sayHello: (
+    SayHello: (
         call: ServerUnaryCall<Request, Response>,
         callback: (err: Error, reply: Response) => void
     ) => {
         const { name } = call.request;
         callback(null, { message: "Hello, " + name } as Response);
     },
-    sayHelloStreamReply: (call: ServerWritableStream<Request, Response>) => {
+    SayHelloStreamReply: (call: ServerWritableStream<Request, Response>) => {
         const { name } = call.request;
         call.write({ message: "Hello 1: " + name } as Response);
         call.write({ message: "Hello 2: " + name } as Response);
         call.write({ message: "Hello 3: " + name } as Response);
         call.end();
     },
-    sayHelloStreamRequest: (call: ServerReadableStream<Request, Response>, callback) => {
+    SayHelloStreamRequest: (call: ServerReadableStream<Request, Response>, callback) => {
         const names: string[] = [];
 
         call.on("data", ({ name }: Request) => {
@@ -102,7 +102,7 @@ server.addService(Greeter.service, {
             callback(err, void 0);
         });
     },
-    sayHelloDuplex: (call: ServerDuplexStream<Request, Response>) => {
+    SayHelloDuplex: (call: ServerDuplexStream<Request, Response>) => {
         call.on("data", ({ name }: Request) => {
             call.write({ message: "Hello, " + name });
         });
@@ -120,7 +120,7 @@ const client = new Greeter(SERVER_ADDRESS, credentials.createInsecure());
 // Calling #waitForReady() is required since at this point the server may not be
 // available yet.
 client.waitForReady(Date.now() + 5000, (_: Error) => {
-    client.sayHello({ name: "World" } as Request, (err: Error, reply: Response) => {
+    client.SayHello({ name: "World" } as Request, (err: Error, reply: Response) => {
         if (err) {
             console.error(err);
         } else {
@@ -128,7 +128,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
         }
     });
 
-    const streamReplyCall: ClientReadableStream<Response> = client.sayHelloStreamReply({
+    const streamReplyCall: ClientReadableStream<Response> = client.SayHelloStreamReply({
         name: "World",
     } as Request);
     streamReplyCall.on("data", (reply: Response) => {
@@ -140,7 +140,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
         console.error(err);
     });
 
-    const streamRequestCall: ClientWritableStream<Request> = client.sayHelloStreamRequest(
+    const streamRequestCall: ClientWritableStream<Request> = client.SayHelloStreamRequest(
         (err: Error, reply: Response) => {
             if (err) {
                 console.error(err);
@@ -157,7 +157,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
     streamRequestCall.write({ name: "Mrs. World" } as Request);
     streamRequestCall.end();
 
-    const duplexCall: ClientDuplexStream<Request, Response> = client.sayHelloDuplex();
+    const duplexCall: ClientDuplexStream<Request, Response> = client.SayHelloDuplex();
     duplexCall.on("data", (reply: Response) => {
         console.log(reply);
         // { message: "Hello, Mr. World" }
@@ -210,29 +210,29 @@ type Response = {
 };
 
 class Greeter {
-    async sayHello({ name }: Request) {
+    async SayHello({ name }: Request) {
         return { message: 'Hello ' + name } as Response;
     }
 
-    async *sayHelloStreamReply({ name }: Request) {
+    async *SayHelloStreamReply({ name }: Request) {
         yield { message: `Hello 1: ${name}` } as Response;
         yield { message: `Hello 2: ${name}` } as Response;
         yield { message: `Hello 3: ${name}` } as Response;
     }
 
-    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
+    async SayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
         const names: string[] = [];
 
         for await (const { name } of stream) {
             names.push(name);
         }
 
-        return await this.sayHello({ name: names.join(", ") });
+        return await this.SayHello({ name: names.join(", ") });
     }
 
-    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+    async *SayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
         for await (const req of stream) {
-            yield await this.sayHello(req);
+            yield await this.SayHello(req);
         }
     }
 }
@@ -254,12 +254,12 @@ const client = connect<Greeter>(
     credentials.createInsecure());
 
 (async () => {
-    const reply = await client.sayHello({ name: "World" });
+    const reply = await client.SayHello({ name: "World" });
     console.log(reply); // { message: "Hello, World" }
 })().catch(console.error);
 
 (async () => {
-    for await (const reply of client.sayHelloStreamReply({ name: "World" })) {
+    for await (const reply of client.SayHelloStreamReply({ name: "World" })) {
         console.log(reply);
         // { message: "Hello 1: World" }
         // { message: "Hello 2: World" }
@@ -268,7 +268,7 @@ const client = connect<Greeter>(
 })().catch(console.error);
 
 (async () => {
-    const call = client.sayHelloStreamRequest();
+    const call = client.SayHelloStreamRequest();
     call.write({ name: "Mr. World" });
     call.write({ name: "Mrs. World" });
 
@@ -277,7 +277,7 @@ const client = connect<Greeter>(
 })().catch(console.error);
 
 (async () => {
-    const call = client.sayHelloDuplex();
+    const call = client.SayHelloDuplex();
     let counter = 0;
 
     call.write({ name: "Mr. World" });
@@ -353,18 +353,20 @@ rewrites some of the interfaces/types seen in the **@grpc/grpc-js** library.
 Anyway, I'll list them as follows:
 
 ```ts
-export function serve<T>(
+import * as grpc from "@grpc/grpc-js";
+
+export declare function serve<T>(
     server: grpc.Server,
     service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>,
     instance: T
 ): void;
 
-export function unserve<T>(
+export declare function unserve<T>(
     server: grpc.Server,
-    service: grpc.ServiceClientConstructor | ServiceDefinition<T>
+    service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>
 ): void;
 
-export function connect<T>(
+export declare function connect<T>(
     service: grpc.ServiceClientConstructor,
     address: string,
     credentials: grpc.ChannelCredentials,
@@ -377,7 +379,7 @@ export type ServerWritableStream<Req, Res> = grpc.ServerWritableStream<Req, Res>
 
 export type ServerReadableStream<Req, Res = void> = grpc.ServerReadableStream<Req, Res> & AsyncIterable<Req>;
 
-export type ServerDuplexStream<Req, Res> = grpc.gServerDuplexStream<Req, Res> & AsyncIterable<Req>;
+export type ServerDuplexStream<Req, Res> = grpc.ServerDuplexStream<Req, Res> & AsyncIterable<Req>;
 
 export type ClientWritableStream<Req, Res> = grpc.ClientWritableStream<Req> & {
     returns(): Promise<Res>;
@@ -387,13 +389,19 @@ export type ClientReadableStream<Res> = grpc.ClientReadableStream<Res> & AsyncIt
 
 export type ClientDuplexStream<Req, Res> = grpc.ClientDuplexStream<Req, Res> & AsyncIterable<Res>;
 
+export type UnaryFunction<Req, Res> = (req: Req, metadata?: grpc.Metadata) => Promise<Res>;
+
+export type StreamResponseFunction<Req, Res> = (req: Req, metadata?: grpc.Metadata) => AsyncGenerator<Res, void, unknown>;
+
 export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
 
 export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
 
 export type ClientMethods<T extends object> = {
-    [K in keyof T]: T[K] extends StreamRequestFunction<infer Req, infer Res> ? () => ClientWritableStream<Req, Res>
-    : T[K] extends DuplexFunction<infer Req, infer Res> ? () => ClientDuplexStream<Req, Res>
+    [K in keyof T]: T[K] extends DuplexFunction<infer Req, infer Res> ? (metadata?: grpc.Metadata) => ClientDuplexStream<Req, Res>
+    : T[K] extends StreamRequestFunction<infer Req, infer Res> ? (metadata?: grpc.Metadata) => ClientWritableStream<Req, Res>
+    : T[K] extends StreamResponseFunction<infer Req, infer Res> ? (req: Req, metadata?: grpc.Metadata) => AsyncGenerator<Res, void, unknown>
+    : T[K] extends UnaryFunction<infer Req, infer Res> ? (req: Req, metadata?: grpc.Metadata) => Promise<Res>
     : T[K];
 };
 
@@ -432,16 +440,16 @@ const proxy = new ServiceProxy({
 (async () => {
     // Be default, the proxy uses round-robin algorithm for routing, so
     // this call happens on the first server instance,
-    const reply1 = await proxy.getInstance().sayHello({ name: "World" });
+    const reply1 = await proxy.getInstance().SayHello({ name: "World" });
 
     // this call happens on the second server instance.
-    const reply2 = await proxy.getInstance().sayHello({ name: "World" });
+    const reply2 = await proxy.getInstance().SayHello({ name: "World" });
 
     // this call happens on the third server instance.
-    const reply3 = await proxy.getInstance().sayHello({ name: "World" });
+    const reply3 = await proxy.getInstance().SayHello({ name: "World" });
 
     // this call happens on the first server instance.
-    const reply4 = await proxy.getInstance().sayHello({ name: "World" });
+    const reply4 = await proxy.getInstance().SayHello({ name: "World" });
 })();
 
 // We can define the route resolver to achieve custom load balancing strategy.
@@ -481,15 +489,15 @@ const proxy2 = new ServiceProxy({
     // These two calls will happen on the same server instance since they have
     // the same route param structure:
     const req1: Request = { name: "Mr. World" };
-    const reply1 = await proxy2.getInstance(req).sayHello(req);
+    const reply1 = await proxy2.getInstance(req).SayHello(req);
 
     const req2: Request = { name: "Mrs. World" };
-    const reply2 = await proxy2.getInstance(req).sayHello(req);
+    const reply2 = await proxy2.getInstance(req).SayHello(req);
 
     // This call happens on the first server since we explicitly set the server
     // address to use:
     const req3: Request = { name: "Mrs. World" };
-    const reply3 = await proxy2.getInstance("localhost:50051").sayHello(req);
+    const reply3 = await proxy2.getInstance("localhost:50051").SayHello(req);
 })();
 ```
 
