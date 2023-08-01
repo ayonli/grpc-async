@@ -344,72 +344,6 @@ See the major differences here?
     again, we use the `for await` statement to receive the responses yielded by
     the server.
 
-## API
-
-There are only two major functions in this package and we have gone through them
-in the above examples. However, for better TypeScript support, this package also
-rewrites some of the interfaces/types seen in the **@grpc/grpc-js** library.
-Anyway, I'll list them as follows:
-
-```ts
-import * as grpc from "@grpc/grpc-js";
-
-export declare function serve<T>(
-    server: grpc.Server,
-    service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>,
-    instance: T
-): void;
-
-export declare function unserve<T>(
-    server: grpc.Server,
-    service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>
-): void;
-
-export declare function connect<T>(
-    service: grpc.ServiceClientConstructor,
-    address: string,
-    credentials: grpc.ChannelCredentials,
-    options?: Partial<grpc.ChannelOptions> & {
-        connectTimeout?: number; // default 120_000 ms
-    }
-): ServiceClient<T>;
-
-export type ServerWritableStream<Req, Res> = grpc.ServerWritableStream<Req, Res>;
-
-export type ServerReadableStream<Req, Res = void> = grpc.ServerReadableStream<Req, Res> & AsyncIterable<Req>;
-
-export type ServerDuplexStream<Req, Res> = grpc.ServerDuplexStream<Req, Res> & AsyncIterable<Req>;
-
-export type ClientWritableStream<Req, Res> = grpc.ClientWritableStream<Req> & {
-    returns(): Promise<Res>;
-};
-
-export type ClientReadableStream<Res> = grpc.ClientReadableStream<Res> & AsyncIterable<Res>;
-
-export type ClientDuplexStream<Req, Res> = grpc.ClientDuplexStream<Req, Res> & AsyncIterable<Res>;
-
-export type UnaryFunction<Req, Res> = (req: Req, metadata?: grpc.Metadata) => Promise<Res>;
-
-export type StreamResponseFunction<Req, Res> = (req: Req, metadata?: grpc.Metadata) => AsyncGenerator<Res, void, unknown>;
-
-export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
-
-export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
-
-export type ClientMethods<T extends object> = {
-    [K in keyof T]: T[K] extends DuplexFunction<infer Req, infer Res> ? (metadata?: grpc.Metadata) => ClientDuplexStream<Req, Res>
-    : T[K] extends StreamRequestFunction<infer Req, infer Res> ? (metadata?: grpc.Metadata) => ClientWritableStream<Req, Res>
-    : T[K] extends StreamResponseFunction<infer Req, infer Res> ? (req: Req, metadata?: grpc.Metadata) => AsyncGenerator<Res, void, unknown>
-    : T[K] extends UnaryFunction<infer Req, infer Res> ? (req: Req, metadata?: grpc.Metadata) => Promise<Res>
-    : T[K];
-};
-
-export type ServiceClient<T extends object> = Omit<grpc.Client, "waitForReady"> & {
-    waitForReady(deadline?: Date | number): Promise<void>;
-    waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
-} & ClientMethods<T>;
-```
-
 ## LoadBalancer
 
 Other than using `connect()` to connect to a certain server, we can use
@@ -561,3 +495,179 @@ For more information about the `LoadBalancer` and the `ConnectionManager`, pleas
 refer to the [source code](./client.ts) of their definition. They are the
 enhancement part of this package that aims to provide straightforward usage of
 gRPC in a project with distributed system design.
+
+## API
+
+Besides the functions and classes, for better TypeScript support, this package
+also rewrites some of the interfaces/types seen in the **@grpc/grpc-js** library,
+I'll list them all as follows:
+
+```ts
+import * as grpc from "@grpc/grpc-js";
+
+export declare function serve<T>(
+    server: grpc.Server,
+    service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>,
+    instance: T
+): void;
+
+export declare function unserve<T>(
+    server: grpc.Server,
+    service: grpc.ServiceClientConstructor | grpc.ServiceDefinition<T>
+): void;
+
+export declare function connect<T>(
+    service: grpc.ServiceClientConstructor,
+    address: string,
+    credentials: grpc.ChannelCredentials,
+    options?: Partial<grpc.ChannelOptions> & {
+        connectTimeout?: number; // default 120_000 ms
+    }
+): ServiceClient<T>;
+
+export type ServerWritableStream<Req, Res> = grpc.ServerWritableStream<Req, Res>;
+
+export type ServerReadableStream<Req, Res = void> = grpc.ServerReadableStream<Req, Res> & AsyncIterable<Req>;
+
+export type ServerDuplexStream<Req, Res> = grpc.ServerDuplexStream<Req, Res> & AsyncIterable<Req>;
+
+export type ClientWritableStream<Req, Res> = grpc.ClientWritableStream<Req> & {
+    returns(): Promise<Res>;
+};
+
+export type ClientReadableStream<Res> = grpc.ClientReadableStream<Res> & AsyncIterable<Res>;
+
+export type ClientDuplexStream<Req, Res> = grpc.ClientDuplexStream<Req, Res> & AsyncIterable<Res>;
+
+export type UnaryFunction<Req, Res> = (req: Req, metadata?: grpc.Metadata) => Promise<Res>;
+
+export type StreamResponseFunction<Req, Res> = (req: Req, metadata?: grpc.Metadata) => AsyncGenerator<Res, void, unknown>;
+
+export type StreamRequestFunction<Req, Res> = (stream: ServerReadableStream<Req>) => Promise<Res>;
+
+export type DuplexFunction<Req, Res> = (stream: ServerDuplexStream<Req, Res>) => AsyncGenerator<Res, void, unknown>;
+
+export type ClientMethods<T extends object> = {
+    [K in keyof T]: T[K] extends DuplexFunction<infer Req, infer Res> ? (metadata?: grpc.Metadata) => ClientDuplexStream<Req, Res>
+    : T[K] extends StreamRequestFunction<infer Req, infer Res> ? (metadata?: grpc.Metadata) => ClientWritableStream<Req, Res>
+    : T[K] extends StreamResponseFunction<infer Req, infer Res> ? (req: Req, metadata?: grpc.Metadata) => AsyncGenerator<Res, void, unknown>
+    : T[K] extends UnaryFunction<infer Req, infer Res> ? (req: Req, metadata?: grpc.Metadata) => Promise<Res>
+    : T[K];
+};
+
+export type ServiceClient<T extends object> = Omit<grpc.Client, "waitForReady"> & {
+    waitForReady(deadline?: Date | number): Promise<void>;
+    waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
+} & ClientMethods<T>;
+
+export type ServerConfig = {
+    address: string;
+    credentials: grpc.ChannelCredentials,
+    options?: Partial<grpc.ChannelOptions> & { connectTimeout?: number; };
+};
+
+export declare class LoadBalancer<T extends object, P extends any = any> {
+    readonly service: grpc.ServiceClientConstructor;
+
+    /**
+     * @param target 
+     * @param servers The server configurations used to create service client.
+     * @param routeResolver Custom route resolver used to implement load
+     *  balancing algorithms, if not provided, a default round-robin algorithm
+     *  is used. The function takes a context object and returns an address
+     *  filtered from the `ctx.servers`.
+     */
+    constructor(
+        service: grpc.ServiceClientConstructor,
+        servers: ServerConfig[],
+        routeResolver?: ((ctx: {
+            service: grpc.ServiceClientConstructor;
+            servers: (ServerConfig & { state: grpc.connectivityState; })[];
+            /**
+             * The route params passed when calling the `getInstance()` function, we
+             * can use this object to calculate the desired route address.
+             */
+            params: P | null;
+            acc: number;
+        }) => string)
+    );
+
+    /**
+     * Dynamically add server configurations at runtime, this is useful when we 
+     * need to implement some kind of service discovery strategy.
+     */
+    addServer(server: ServerConfig): boolean;
+
+    /**
+     * Dynamically remove server configurations at runtime, this is useful when we 
+     * need to implement some kind of service discovery strategy.
+     */
+    removeServer(address: string): boolean;
+
+    /**
+     * Retrieves an instance of the service client.
+     * 
+     * @param routeParams If a custom `routeResolver` is provided when initiating
+     *  the load balancer, this argument will be passed to the function for route
+     *  calculation, otherwise, it has no effect.
+     * @returns 
+     */
+    getInstance(routeParams?: P): ServiceClient<T>;
+
+    /** Closes all the connection. */
+    close(): void;
+}
+
+export interface ServiceProxyOf<T extends object, P extends any = any> {
+    (): ServiceClient<T>;
+    (routeParams: P): ServiceClient<T>;
+};
+
+export type ChainingProxyInterface = ServiceProxyOf<any, any> & {
+    [nsp: string]: ChainingProxyInterface;
+};
+
+export declare class ConnectionManager {
+    register(target: ServiceClient<any> | LoadBalancer<any>): boolean;
+
+    /**
+     * @param target If the target is a string, it is the full name of the
+     *  service (includes the package name, concatenated with `.`).
+     */
+    deregister(target: string | ServiceClient<any> | LoadBalancer<any>, closeConnection?: boolean): boolean;
+
+    /**
+     * @param target If the target is a string, it is the full name of the
+     *  service (includes the package name, concatenated with `.`).
+     * @param routeParams If a custom `routeResolver` is provided when initiating
+     *  the load balancer, this argument will be passed to the function for route
+     *  calculation, otherwise, it has no effect.
+     * @throws If the target service is not registered, a ReferenceError will be
+     *  thrown.
+     */
+    getInstanceOf<T extends object>(
+        target: string | ServiceClient<T> | LoadBalancer<T>
+    ): ServiceClient<T>;
+    getInstanceOf<T extends object, P extends any = any>(
+        target: string | ServiceClient<T> | LoadBalancer<T>,
+        routeParams: P
+    ): ServiceClient<T>;
+
+    /** Closes all the connections of all proxies. */
+    close(): void;
+
+    /**
+     * Instead of calling `#getInstanceOf()` to retrieve the service client,
+     * this function allows us to use chaining syntax to dynamically generated
+     * namespaces and client constructors that can be used as a syntax sugar.
+     * @example
+     *  // Instead of this:
+     *  const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
+     * 
+     *  // We do this:
+     *  const services = manager.useChainingSyntax();
+     *  const ins = services.examples.Greeter();
+     */
+    useChainingSyntax(): ChainingProxyInterface;
+}
+```

@@ -243,7 +243,6 @@ export class LoadBalancer<T extends object, P extends any = any> {
     protected acc = 0;
 
     /**
-     * 
      * @param target 
      * @param servers The server configurations used to create service client.
      * @param routeResolver Custom route resolver used to implement load
@@ -294,10 +293,10 @@ export class LoadBalancer<T extends object, P extends any = any> {
 
     /**
      * Retrieves an instance of the service client.
+     * 
      * @param routeParams If a custom `routeResolver` is provided when initiating
      *  the load balancer, this argument will be passed to the function for route
      *  calculation, otherwise, it has no effect.
-     * @returns 
      */
     getInstance(routeParams: P = null): ServiceClient<T> {
         let address: string;
@@ -402,10 +401,8 @@ export class ConnectionManager {
     }
 
     /**
-     * 
      * @param target If the target is a string, it is the full name of the
      *  service (includes the package name, concatenated with `.`).
-     * @returns 
      */
     deregister(target: string | ServiceClient<any> | LoadBalancer<any>, closeConnection = false) {
         const name = this.unpackServiceFullName(target);
@@ -424,7 +421,6 @@ export class ConnectionManager {
     }
 
     /**
-     * 
      * @param target If the target is a string, it is the full name of the
      *  service (includes the package name, concatenated with `.`).
      * @param routeParams If a custom `routeResolver` is provided when initiating
@@ -476,9 +472,7 @@ export class ConnectionManager {
         }
     }
 
-    /**
-     * Closes all the connections of all proxies.
-     */
+    /** Closes all the connections of all proxies. */
     close() {
         this.registry.forEach(balancer => {
             balancer.close();
