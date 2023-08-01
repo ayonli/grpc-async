@@ -57,7 +57,6 @@ const PROTO_PATH = __dirname + '/examples/Greeter.proto';
 const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-    keepCase: true,
     longs: String,
     enums: String,
     defaults: true,
@@ -77,21 +76,21 @@ type Response = {
 // ==== server ====
 const server = new Server();
 server.addService(Greeter.service, {
-    SayHello: (
+    sayHello: (
         call: ServerUnaryCall<Request, Response>,
         callback: (err: Error, reply: Response) => void
     ) => {
         const { name } = call.request;
         callback(null, { message: "Hello, " + name } as Response);
     },
-    SayHelloStreamReply: (call: ServerWritableStream<Request, Response>) => {
+    sayHelloStreamReply: (call: ServerWritableStream<Request, Response>) => {
         const { name } = call.request;
         call.write({ message: "Hello 1: " + name } as Response);
         call.write({ message: "Hello 2: " + name } as Response);
         call.write({ message: "Hello 3: " + name } as Response);
         call.end();
     },
-    SayHelloStreamRequest: (call: ServerReadableStream<Request, Response>, callback) => {
+    sayHelloStreamRequest: (call: ServerReadableStream<Request, Response>, callback) => {
         const names: string[] = [];
 
         call.on("data", ({ name }: Request) => {
@@ -102,7 +101,7 @@ server.addService(Greeter.service, {
             callback(err, void 0);
         });
     },
-    SayHelloDuplex: (call: ServerDuplexStream<Request, Response>) => {
+    sayHelloDuplex: (call: ServerDuplexStream<Request, Response>) => {
         call.on("data", ({ name }: Request) => {
             call.write({ message: "Hello, " + name });
         });
@@ -120,7 +119,7 @@ const client = new Greeter(SERVER_ADDRESS, credentials.createInsecure());
 // Calling #waitForReady() is required since at this point the server may not be
 // available yet.
 client.waitForReady(Date.now() + 5000, (_: Error) => {
-    client.SayHello({ name: "World" } as Request, (err: Error, reply: Response) => {
+    client.sayHello({ name: "World" } as Request, (err: Error, reply: Response) => {
         if (err) {
             console.error(err);
         } else {
@@ -128,7 +127,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
         }
     });
 
-    const streamReplyCall: ClientReadableStream<Response> = client.SayHelloStreamReply({
+    const streamReplyCall: ClientReadableStream<Response> = client.sayHelloStreamReply({
         name: "World",
     } as Request);
     streamReplyCall.on("data", (reply: Response) => {
@@ -140,7 +139,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
         console.error(err);
     });
 
-    const streamRequestCall: ClientWritableStream<Request> = client.SayHelloStreamRequest(
+    const streamRequestCall: ClientWritableStream<Request> = client.sayHelloStreamRequest(
         (err: Error, reply: Response) => {
             if (err) {
                 console.error(err);
@@ -157,7 +156,7 @@ client.waitForReady(Date.now() + 5000, (_: Error) => {
     streamRequestCall.write({ name: "Mrs. World" } as Request);
     streamRequestCall.end();
 
-    const duplexCall: ClientDuplexStream<Request, Response> = client.SayHelloDuplex();
+    const duplexCall: ClientDuplexStream<Request, Response> = client.sayHelloDuplex();
     duplexCall.on("data", (reply: Response) => {
         console.log(reply);
         // { message: "Hello, Mr. World" }
@@ -210,29 +209,29 @@ type Response = {
 };
 
 class Greeter {
-    async SayHello({ name }: Request) {
+    async sayHello({ name }: Request) {
         return { message: 'Hello ' + name } as Response;
     }
 
-    async *SayHelloStreamReply({ name }: Request) {
+    async *sayHelloStreamReply({ name }: Request) {
         yield { message: `Hello 1: ${name}` } as Response;
         yield { message: `Hello 2: ${name}` } as Response;
         yield { message: `Hello 3: ${name}` } as Response;
     }
 
-    async SayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
+    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
         const names: string[] = [];
 
         for await (const { name } of stream) {
             names.push(name);
         }
 
-        return await this.SayHello({ name: names.join(", ") });
+        return await this.sayHello({ name: names.join(", ") });
     }
 
-    async *SayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
         for await (const req of stream) {
-            yield await this.SayHello(req);
+            yield await this.sayHello(req);
         }
     }
 }
@@ -254,12 +253,12 @@ const client = connect<Greeter>(
     credentials.createInsecure());
 
 (async () => {
-    const reply = await client.SayHello({ name: "World" });
+    const reply = await client.sayHello({ name: "World" });
     console.log(reply); // { message: "Hello, World" }
 })().catch(console.error);
 
 (async () => {
-    for await (const reply of client.SayHelloStreamReply({ name: "World" })) {
+    for await (const reply of client.sayHelloStreamReply({ name: "World" })) {
         console.log(reply);
         // { message: "Hello 1: World" }
         // { message: "Hello 2: World" }
@@ -268,7 +267,7 @@ const client = connect<Greeter>(
 })().catch(console.error);
 
 (async () => {
-    const call = client.SayHelloStreamRequest();
+    const call = client.sayHelloStreamRequest();
     call.write({ name: "Mr. World" });
     call.write({ name: "Mrs. World" });
 
@@ -277,7 +276,7 @@ const client = connect<Greeter>(
 })().catch(console.error);
 
 (async () => {
-    const call = client.SayHelloDuplex();
+    const call = client.sayHelloDuplex();
     let counter = 0;
 
     call.write({ name: "Mr. World" });
@@ -437,16 +436,16 @@ const balancer = new LoadBalancer(examples.Greeter as ServiceClientConstructor, 
 (async () => {
     // Be default, the load balancer uses round-robin algorithm for routing, so
     // this call happens on the first server instance,
-    const reply1 = await balancer.getInstance().SayHello({ name: "World" });
+    const reply1 = await balancer.getInstance().sayHello({ name: "World" });
 
     // this call happens on the second server instance.
-    const reply2 = await balancer.getInstance().SayHello({ name: "World" });
+    const reply2 = await balancer.getInstance().sayHello({ name: "World" });
 
     // this call happens on the third server instance.
-    const reply3 = await balancer.getInstance().SayHello({ name: "World" });
+    const reply3 = await balancer.getInstance().sayHello({ name: "World" });
 
     // this call happens on the first server instance.
-    const reply4 = await balancer.getInstance().SayHello({ name: "World" });
+    const reply4 = await balancer.getInstance().sayHello({ name: "World" });
 })();
 
 // We can define the route resolver to achieve custom load balancing strategy.
@@ -483,15 +482,15 @@ const balancer2 = new LoadBalancer(examples.Greeter as ServiceClientConstructor,
     // These two calls will happen on the same server instance since they have
     // the same route param structure:
     const req1: Request = { name: "Mr. World" };
-    const reply1 = await balancer2.getInstance(req).SayHello(req);
+    const reply1 = await balancer2.getInstance(req).sayHello(req);
 
     const req2: Request = { name: "Mrs. World" };
-    const reply2 = await balancer2.getInstance(req).SayHello(req);
+    const reply2 = await balancer2.getInstance(req).sayHello(req);
 
     // This call happens on the first server since we explicitly set the server
     // address to use:
     const req3: Request = { name: "Mrs. World" };
-    const reply3 = await balancer2.getInstance("localhost:50051").SayHello(req);
+    const reply3 = await balancer2.getInstance("localhost:50051").sayHello(req);
 })();
 ```
 

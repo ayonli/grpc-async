@@ -8,7 +8,7 @@ import {
 import { SERVER_ADDRESS, examples, Request, Response } from "./traditional";
 
 export class Greeter {
-    async SayHello({ name }: Request, metadata: Metadata | undefined = void 0) {
+    async sayHello({ name }: Request, metadata: Metadata | undefined = void 0) {
         if (metadata && String(metadata.get("foo"))) { // metadata.get() return empty array if the key doesn't exist
             return { message: `Hello, ${name} with { foo: ${metadata.get("foo")} }` } as Response;
         } else {
@@ -16,7 +16,7 @@ export class Greeter {
         }
     }
 
-    async *SayHelloStreamReply({ name }: Request, metadata: Metadata | undefined = void 0) {
+    async *sayHelloStreamReply({ name }: Request, metadata: Metadata | undefined = void 0) {
         if (metadata && String(metadata.get("foo"))) {
             yield { message: `Hello 1: ${name} with { foo: ${metadata.get("foo")} }` } as Response;
             yield { message: `Hello 2: ${name} with { foo: ${metadata.get("foo")} }` } as Response;
@@ -28,19 +28,19 @@ export class Greeter {
         }
     }
 
-    async SayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
+    async sayHelloStreamRequest(stream: ServerReadableStream<Request, Response>) {
         const names: string[] = [];
 
         for await (const { name } of stream) {
             names.push(name);
         }
 
-        return await this.SayHello({ name: names.join(", ") }, stream.metadata);
+        return await this.sayHello({ name: names.join(", ") }, stream.metadata);
     }
 
-    async *SayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
+    async *sayHelloDuplex(stream: ServerDuplexStream<Request, Response>) {
         for await (const { name } of stream) {
-            yield await this.SayHello({ name }, stream.metadata);
+            yield await this.sayHello({ name }, stream.metadata);
         }
     }
 }
@@ -64,12 +64,12 @@ if (require.main?.filename === __filename) {
     const jobs: Promise<void>[] = [];
 
     jobs.push((async () => {
-        const reply = await client.SayHello({ name: "World" });
+        const reply = await client.sayHello({ name: "World" });
         console.log(reply); // { message: "Hello, World" }
     })());
 
     jobs.push((async () => {
-        for await (const reply of client.SayHelloStreamReply({ name: "World" })) {
+        for await (const reply of client.sayHelloStreamReply({ name: "World" })) {
             console.log(reply);
             // { message: "Hello 1: World" }
             // { message: "Hello 2: World" }
@@ -78,7 +78,7 @@ if (require.main?.filename === __filename) {
     })());
 
     jobs.push((async () => {
-        const streamRequestCall = client.SayHelloStreamRequest();
+        const streamRequestCall = client.sayHelloStreamRequest();
         streamRequestCall.write({ name: "Mr. World" });
         streamRequestCall.write({ name: "Mrs. World" });
         const reply1 = await streamRequestCall.returns();
@@ -86,7 +86,7 @@ if (require.main?.filename === __filename) {
     })());
 
     jobs.push((async () => {
-        const duplexCall = client.SayHelloDuplex();
+        const duplexCall = client.sayHelloDuplex();
         let counter = 0;
         duplexCall.write({ name: "Mr. World" });
         duplexCall.write({ name: "Mrs. World" });
