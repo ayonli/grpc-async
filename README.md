@@ -498,7 +498,7 @@ gRPC in a project with distributed system design.
 
 ## API
 
-Besides the functions and classes, for better TypeScript support, this package
+Apart from the functions and classes, for better TypeScript support, this package
 also rewrites some of the interfaces/types seen in the **@grpc/grpc-js** library,
 I'll list them all as follows:
 
