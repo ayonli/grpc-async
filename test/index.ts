@@ -559,6 +559,22 @@ describe("ConnectionManager", () => {
 
         manager.close();
     });
+
+    it("should use chaining syntax with a root namespace", async () => {
+        const manager = new ConnectionManager();
+        const client = connect<Greeter>(
+            examples.Greeter as ServiceClientConstructor,
+            SERVER_ADDRESS,
+            credentials.createInsecure());
+        manager.register(client);
+
+        const _examples = manager.useChainingSyntax("examples");
+
+        const result = await (_examples.Greeter as ServiceClient<Greeter>).sayHello({ name: "World" });
+        deepStrictEqual(result, { message: "Hello, World. I'm server 1" });
+
+        manager.close();
+    });
 });
 
 declare global {

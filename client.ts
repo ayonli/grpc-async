@@ -43,6 +43,23 @@ export type ServiceClient<T extends object> = Omit<Client, "waitForReady"> & {
     waitForReady(deadline: Date | number, callback: (err: Error) => void): void;
 } & ClientMethods<T>;
 
+function captureCallStack() {
+    const call: { stack?: string; } = {};
+    Error.captureStackTrace(call, captureCallStack);
+    return call as { stack: string };
+}
+
+function patchCallStack(err: unknown, trace: { stack: string; }) {
+    if (err instanceof Error) {
+        Object.defineProperty(err, "stack", {
+            configurable: true,
+            writable: true,
+            enumerable: false,
+            value: err.stack + trace.stack
+        });
+    }
+}
+
 export function connect<T extends object>(
     service: ServiceClientConstructor,
     address: string,
@@ -172,20 +189,30 @@ export function connect<T extends object>(
             }
         } else if (def.responseStream) {
             newFn = async function* (data: any, metadata: Metadata | undefined = void 0) {
-                await waitForReady();
-                const call: gClientReadableStream<any> = originalFn(data, metadata);
+                const stack = captureCallStack();
 
-                for await (const value of call) {
-                    yield value;
+                try {
+                    await waitForReady();
+                    const call: gClientReadableStream<any> = originalFn(data, metadata);
+
+                    for await (const value of call) {
+                        yield value;
+                    }
+                } catch (err) {
+                    patchCallStack(err, stack);
+                    throw err;
                 }
             } as AsyncGeneratorFunction;
         } else {
             newFn = (data: any, metadata: Metadata | undefined = void 0) => {
+                const stack = captureCallStack();
+
                 return new Promise((resolve, reject) => {
                     Promise.resolve(waitForReady()).then(() => {
                         if (metadata) {
                             originalFn(data, metadata, (err: unknown, res: any) => {
                                 if (err) {
+                                    patchCallStack(err, stack);
                                     reject(err);
                                 } else {
                                     resolve(res);
@@ -194,6 +221,7 @@ export function connect<T extends object>(
                         } else {
                             originalFn(data, (err: unknown, res: any) => {
                                 if (err) {
+                                    patchCallStack(err, stack);
                                     reject(err);
                                 } else {
                                     resolve(res);
@@ -365,7 +393,7 @@ export class LoadBalancer<T extends object, P extends any = any> {
     }
 }
 
-export type ChainingProxyInterface = ServiceClient<any> & {
+export type ChainingProxyInterface = ServiceClient<any> | {
     [nsp: string]: ChainingProxyInterface;
 };
 
@@ -485,9 +513,14 @@ export class ConnectionManager {
      *  // We do this:
      *  const services = manager.useChainingSyntax();
      *  const result = await services.examples.Greeter.sayHello({ name: "World" });
+     * @param rootNsp If set, the namespace will start from the given name.
+     *  Usually leave blank or set to the package name in the proto file.
+     * @example
+     *  const examples = manager.useChainingSyntax("examples");
+     *  const result = await examples.Greeter.sayHello({ name: "World" });
      */
-    useChainingSyntax() {
-        return new ChainingProxy("", this) as any as ChainingProxyInterface;
+    useChainingSyntax(rootNsp = "") {
+        return new ChainingProxy(rootNsp, this) as any as ChainingProxyInterface;
     }
 }
 

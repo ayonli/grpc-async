@@ -619,7 +619,7 @@ export declare class LoadBalancer<T extends object, P extends any = any> {
     close(): void;
 }
 
-export type ChainingProxyInterface = ServiceClient<any> & {
+export type ChainingProxyInterface = ServiceClient<any> | {
     [nsp: string]: ChainingProxyInterface;
 };
 
@@ -664,7 +664,12 @@ export declare class ConnectionManager {
      *  // We do this:
      *  const services = manager.useChainingSyntax();
      *  const result = await services.examples.Greeter.sayHello({ name: "World" });
+     * @param rootNsp If set, the namespace will start from the given name.
+     *  Usually leave blank or set to the package name in the proto file.
+     * @example
+     *  const examples = manager.useChainingSyntax("examples");
+     *  const result = await examples.Greeter.sayHello({ name: "World" });
      */
-    useChainingSyntax(): ChainingProxyInterface;
+    useChainingSyntax(rootNsp?: string): ChainingProxyInterface;
 }
 ```
