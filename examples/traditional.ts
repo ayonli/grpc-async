@@ -15,7 +15,7 @@ import {
     ServiceClientConstructor
 } from "@grpc/grpc-js";
 
-const PROTO_PATH = __dirname + '/index.proto';
+const PROTO_PATH = __dirname + '/Greeter.proto';
 export const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {

@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.23.4
-// source: examples/index.proto
+// source: examples/Greeter.proto
 
 package examples
 
@@ -310,5 +310,5 @@ var Greeter_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "examples/index.proto",
+	Metadata: "examples/Greeter.proto",
 }

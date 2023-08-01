@@ -53,7 +53,7 @@ import {
     ClientDuplexStream
 } from "@grpc/grpc-js"
 
-const PROTO_PATH = __dirname + '/examples/index.proto';
+const PROTO_PATH = __dirname + '/examples/Greeter.proto';
 const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -189,7 +189,7 @@ import {
     ServerDuplexStream
 } from "."; // replace this with "@hyurl/grpc-async" in your code
 
-const PROTO_PATH = __dirname + '/examples/examples.proto';
+const PROTO_PATH = __dirname + '/examples/Greeter.proto';
 const SERVER_ADDRESS = "localhost:50051";
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
