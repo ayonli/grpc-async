@@ -365,13 +365,7 @@ export class LoadBalancer<T extends object, P extends any = any> {
     }
 }
 
-
-export interface ServiceProxyOf<T extends object, P extends any = any> {
-    (): ServiceClient<T>;
-    (routeParams: P): ServiceClient<T>;
-};
-
-export type ChainingProxyInterface = ServiceProxyOf<any, any> & {
+export type ChainingProxyInterface = ServiceClient<any> & {
     [nsp: string]: ChainingProxyInterface;
 };
 
@@ -484,12 +478,13 @@ export class ConnectionManager {
      * this function allows us to use chaining syntax to dynamically generated
      * namespaces and client constructors that can be used as a syntax sugar.
      * @example
-     *  // Instead of this:
+     *  // Instead of doing this:
      *  const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
+     *  const result = await ins.sayHello({ name: "World" });
      * 
      *  // We do this:
      *  const services = manager.useChainingSyntax();
-     *  const ins = services.examples.Greeter();
+     *  const result = await services.examples.Greeter.sayHello({ name: "World" });
      */
     useChainingSyntax() {
         return new ChainingProxy("", this) as any as ChainingProxyInterface;
@@ -526,8 +521,17 @@ class ChainingProxy {
 }
 
 function createChainingProxy(target: string, manager: ConnectionManager) {
-    const chain: ChainingProxy = function (routeParams: any = null) {
-        return manager.getInstanceOf(target, routeParams);
+    const chain: ChainingProxy = function (data: any = null) {
+        const index = target.lastIndexOf(".");
+        const serviceName = target.slice(0, index);
+        const method = target.slice(index + 1);
+        const ins = manager.getInstanceOf(serviceName, data);
+
+        if (typeof ins[method] === "function") {
+            return ins[method](data);
+        } else {
+            throw new TypeError(`${target} is not a function`);
+        }
     } as any;
 
     Object.setPrototypeOf(chain, ChainingProxy.prototype);

@@ -10,8 +10,7 @@ import {
     ServiceClient,
     unserve,
     LoadBalancer,
-    ConnectionManager,
-    ServiceProxyOf
+    ConnectionManager
 } from "../index";
 import { SERVER_ADDRESS, examples, Request, Response } from "../examples/traditional";
 import { Greeter } from "../examples/async";
@@ -535,9 +534,8 @@ describe("ConnectionManager", () => {
         // @ts-ignore
         global["services"] = manager.useChainingSyntax();
 
-        const ins = services.examples.Greeter();
-        const result1 = await ins.sayHello({ name: "World" });
-        deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
+        const result = await services.examples.Greeter.sayHello({ name: "World" });
+        deepStrictEqual(result, { message: "Hello, World. I'm server 1" });
 
         manager.close();
     });
@@ -556,9 +554,8 @@ describe("ConnectionManager", () => {
         // @ts-ignore
         global["services"] = manager.useChainingSyntax();
 
-        const ins = services.examples.Greeter({ name: "World" });
-        const result1 = await ins.sayHello({ name: "World" });
-        deepStrictEqual(result1, { message: "Hello, World. I'm server 1" });
+        const result = await services.examples.Greeter.sayHello({ name: "World" });
+        deepStrictEqual(result, { message: "Hello, World. I'm server 1" });
 
         manager.close();
     });
@@ -566,6 +563,6 @@ describe("ConnectionManager", () => {
 
 declare global {
     namespace services.examples {
-        const Greeter: ServiceProxyOf<Greeter, Request>;
+        const Greeter: ServiceClient<Greeter>;
     }
 }

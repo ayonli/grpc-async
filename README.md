@@ -460,13 +460,14 @@ manager.register(balancer);
 
 // and use it anywhere
 const ins = services.getInstanceOf<Greeter>("examples.Greeter");
+const result = await ins.sayHello({ name: "World" });
 ```
 
 **Further more**, we can extend our `services` via chaining syntax, make our code
 even more cleaner and elegant.
 
 ```ts
-import { ConnectionManager, ServiceProxyOf } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { ConnectionManager, ServiceClient } from "."; // replace this with `@hyurl/grpc-async` in your code
 // ...
 
 declare global {
@@ -474,7 +475,7 @@ declare global {
     // namespace which contains sub namespaces that corresponds the package name
     // in the .proto file.
     namespace services.examples {
-        const Greeter: ServiceProxyOf<Greeter>;
+        const Greeter: ServiceClient<Greeter>;
     }
 }
 
@@ -488,7 +489,7 @@ manager.register(balancer);
 global["services"] = manager.useChainingSyntax();
 
 // and use it anywhere
-const ins = services.examples.Greeter();
+const result = await services.examples.Greeter.sayHello({ name: "World" });
 ```
 
 For more information about the `LoadBalancer` and the `ConnectionManager`, please
@@ -618,12 +619,7 @@ export declare class LoadBalancer<T extends object, P extends any = any> {
     close(): void;
 }
 
-export interface ServiceProxyOf<T extends object, P extends any = any> {
-    (): ServiceClient<T>;
-    (routeParams: P): ServiceClient<T>;
-};
-
-export type ChainingProxyInterface = ServiceProxyOf<any, any> & {
+export type ChainingProxyInterface = ServiceClient<any> & {
     [nsp: string]: ChainingProxyInterface;
 };
 
@@ -661,12 +657,13 @@ export declare class ConnectionManager {
      * this function allows us to use chaining syntax to dynamically generated
      * namespaces and client constructors that can be used as a syntax sugar.
      * @example
-     *  // Instead of this:
+     *  // Instead of doing this:
      *  const ins = manager.getInstanceOf<Greeter>("examples.Greeter");
+     *  const result = await ins.sayHello({ name: "World" });
      * 
      *  // We do this:
      *  const services = manager.useChainingSyntax();
-     *  const ins = services.examples.Greeter();
+     *  const result = await services.examples.Greeter.sayHello({ name: "World" });
      */
     useChainingSyntax(): ChainingProxyInterface;
 }
