@@ -27,14 +27,6 @@
             "noEmit": true,
             "noUnusedParameters": true,
             "noUnusedLocals": true
-        },
-        "include": [
-            "./test/*.ts"
-        ],
-        "paths": {
-            "@hyurl/grpc-async": [
-                "../index"
-            ]
         }
     }
 }

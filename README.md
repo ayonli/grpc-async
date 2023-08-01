@@ -186,7 +186,7 @@ import {
     connect,
     ServerReadableStream,
     ServerDuplexStream
-} from "."; // replace this with "@hyurl/grpc-async" in your code
+} from "@hyurl/grpc-async";
 
 const PROTO_PATH = __dirname + '/examples/Greeter.proto';
 const SERVER_ADDRESS = "localhost:50051";
@@ -357,7 +357,7 @@ and we can programmatically control how our traffic is routed to different
 server instances on demand.
 
 ```ts
-import { LoadBalancer } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { LoadBalancer } from "@hyurl/grpc-async";
 // ...
 
 // Imagine we have three server instances run on the same server (localhost).
@@ -444,7 +444,7 @@ anywhere we want without worrying how to import them.
 For example:
 
 ```ts
-import { ConnectionManager } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { ConnectionManager } from "@hyurl/grpc-async";
 // ...
 
 declare global {
@@ -467,7 +467,7 @@ const result = await ins.sayHello({ name: "World" });
 even more cleaner and elegant.
 
 ```ts
-import { ConnectionManager, ServiceClient } from "."; // replace this with `@hyurl/grpc-async` in your code
+import { ConnectionManager, ServiceClient } from "@hyurl/grpc-async";
 // ...
 
 declare global {
