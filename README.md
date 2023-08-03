@@ -404,7 +404,7 @@ const balancer2 = new LoadBalancer(examples.Greeter as ServiceClientConstructor,
     } else if (typeof ctx.params === "object") {
         // This algorithm guarantees the same param structure passed to the
         // `getInstance()` returns the same service instance.
-        const id: number = hash(Object.keys(ctx.params ?? {}).sort());
+        const id: number = hash(String(Object.keys(ctx.params ?? {}).sort()));
         return addresses[id % addresses.length];
     } else {
         // use round-robin
