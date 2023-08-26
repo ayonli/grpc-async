@@ -1,4 +1,4 @@
-# @hyurl/grpc-async
+# @ayonli/grpc-async
 
 A gRPC wrapper for Node.js with async functions.
 
@@ -20,11 +20,11 @@ async/await functionality into both the gRPC server and the client.
 
 ## Install
 
-In order to install this package, you must install **@grpc/grpc-js** and
+In order to install this package, we must install **@grpc/grpc-js** and
 **@grpc/proto-loader** as well.
 
 ```sh
-npm i @grpc/grpc-js @grpc/proto-loader @hyurl/grpc-async
+npm i @grpc/grpc-js @grpc/proto-loader @ayonli/grpc-async
 ```
 
 ## Examples
@@ -186,7 +186,7 @@ import {
     connect,
     ServerReadableStream,
     ServerDuplexStream
-} from "@hyurl/grpc-async";
+} from "@ayonli/grpc-async";
 
 const PROTO_PATH = __dirname + '/examples/Greeter.proto';
 const SERVER_ADDRESS = "localhost:50051";
@@ -295,7 +295,7 @@ const client = connect<Greeter>(
 // ==== client ====
 ```
 
-*You can see more about the examples in the [examples](./examples) folder.*
+*We can see more about the examples in the [examples](./examples) folder.*
 
 #### Recap
 
@@ -357,7 +357,7 @@ and we can programmatically control how our traffic is routed to different
 server instances on demand.
 
 ```ts
-import { LoadBalancer } from "@hyurl/grpc-async";
+import { LoadBalancer } from "@ayonli/grpc-async";
 // ...
 
 // Imagine we have three server instances run on the same server (localhost).
@@ -444,7 +444,7 @@ anywhere we want without worrying how to import them.
 For example:
 
 ```ts
-import { ConnectionManager } from "@hyurl/grpc-async";
+import { ConnectionManager } from "@ayonli/grpc-async";
 // ...
 
 declare global {
@@ -467,7 +467,7 @@ const result = await ins.sayHello({ name: "World" });
 even more cleaner and elegant.
 
 ```ts
-import { ConnectionManager, ServiceClient } from "@hyurl/grpc-async";
+import { ConnectionManager, ServiceClient } from "@ayonli/grpc-async";
 // ...
 
 declare global {

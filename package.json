@@ -1,6 +1,6 @@
 {
-  "name": "@hyurl/grpc-async",
-  "version": "1.0.0",
+  "name": "@ayonli/grpc-async",
+  "version": "0.1.0",
   "description": "A gRPC wrapper for Node.js with async functions",
   "main": "index.js",
   "types": "index.d.ts",
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hyurl/grpc-async.git"
+    "url": "git+https://github.com/ayonli/grpc-async.git"
   },
   "keywords": [
     "gRPC",
@@ -21,11 +21,11 @@
   "author": "A-yon Lee <the@ayon.li>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/hyurl/grpc-async/issues"
+    "url": "https://github.com/ayonli/grpc-async/issues"
   },
-  "homepage": "https://github.com/hyurl/grpc-async#readme",
+  "homepage": "https://github.com/ayonli/grpc-async#readme",
   "dependencies": {
-    "js-magic": "^1.2.4",
+    "js-magic": "^1.3.0",
     "tslib": "^2.6.1"
   },
   "devDependencies": {

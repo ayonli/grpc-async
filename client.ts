@@ -326,7 +326,7 @@ export class LoadBalancer<T extends object, P extends any = any> {
      *  the load balancer, this argument will be passed to the function for route
      *  calculation, otherwise, it has no effect.
      */
-    getInstance(routeParams: P = null): ServiceClient<T> {
+    getInstance(routeParams: P | null = null): ServiceClient<T> {
         let address: string;
 
         if (this.routeResolver) {
@@ -460,7 +460,7 @@ export class ConnectionManager {
     ): ServiceClient<T>;
     getInstanceOf<T extends object, P extends any = any>(
         target: string | ServiceClient<T> | LoadBalancer<T>,
-        routeParams: P = null
+        routeParams: P | null = null
     ): ServiceClient<T> {
         const name = this.unpackServiceFullName(target);
         const client = this.registry.get(name);

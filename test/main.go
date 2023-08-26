@@ -7,7 +7,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/hyurl/grpc-async/examples"
+	"github.com/ayonli/grpc-async/examples"
 	"google.golang.org/grpc"
 )
 
