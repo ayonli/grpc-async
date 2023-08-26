@@ -1,4 +1,4 @@
-# @ayonli/grpc-async
+# gRPC Async
 
 A gRPC wrapper for Node.js with async functions.
 
