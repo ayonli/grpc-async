@@ -4,7 +4,7 @@ import {
     connect,
     ServerReadableStream,
     ServerDuplexStream
-} from "../index"; // replace this with "@ayonli/grpc-async" in your code
+} from "../index"; // replace this with "@ayonli/grpc-async" in real code
 import { SERVER_ADDRESS, examples, Request, Response } from "./traditional";
 
 export class Greeter {

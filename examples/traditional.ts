@@ -112,8 +112,8 @@ if (require.main?.filename === __filename) {
                 } else {
                     console.log(reply); // { message: "Hello, Mr. World, Mrs. World" }
 
-                    // THINK: do you know what to do with the **reply**? If your code
-                    // logic is from top to bottom, but you get the reply above your
+                    // THINK: what should we do with the **reply**? If our code
+                    // logic is from top to bottom, but we get the reply above the
                     // logic.
                 }
             }
