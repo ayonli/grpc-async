@@ -4,6 +4,7 @@
         "target": "es2018",
         "newLine": "LF",
         "importHelpers": true,
+        "moduleResolution": "NodeNext",
         "strict": true,
         "noUnusedParameters": true,
         "noUnusedLocals": true,

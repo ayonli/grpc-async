@@ -3,7 +3,5 @@ test
 examples
 .*
 *.tgz
-*.ts
-!*.d.ts
 tsconfig.json
 go.*
