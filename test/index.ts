@@ -14,7 +14,7 @@ import {
 } from "../index";
 import { SERVER_ADDRESS, examples, Request, Response } from "../examples/traditional";
 import { Greeter } from "../examples/async";
-import _try from "dotry";
+import { _try } from "@ayonli/jsext";
 
 describe("node-server <=> node-client", () => {
     let server: Server;
@@ -155,7 +155,7 @@ describe("node-server <=> node-client", () => {
 
     describe("reload service", () => {
         class NewGreeter extends Greeter {
-            async sayHello({ name }: Request): Promise<Response> {
+            override async sayHello({ name }: Request): Promise<Response> {
                 return { message: "Hi, " + name };
             }
         }
@@ -272,19 +272,19 @@ const addresses = [
 ];
 
 class Greeter1 extends Greeter {
-    async sayHello({ name }: Request) {
+    override async sayHello({ name }: Request) {
         return { message: "Hello, " + name + ". I'm server 1" } as Response;
     }
 }
 
 class Greeter2 extends Greeter {
-    async sayHello({ name }: Request) {
+    override async sayHello({ name }: Request) {
         return { message: "Hello, " + name + ". I'm server 2" } as Response;
     }
 }
 
 class Greeter3 extends Greeter {
-    async sayHello({ name }: Request) {
+    override async sayHello({ name }: Request) {
         return { message: "Hello, " + name + ". I'm server 3" } as Response;
     }
 }
@@ -294,7 +294,7 @@ describe("LoadBalancer", () => {
 
     before(async () => {
         for (let i = 0; i < addresses.length; i++) {
-            const addr = addresses[i];
+            const addr = addresses[i] as string;
             const server = new Server();
 
             if (i === 0) {
@@ -357,9 +357,9 @@ describe("LoadBalancer", () => {
             })),
             ({ servers, params }) => {
                 if (params?.name === "Mr. World") {
-                    return servers[0].address;
+                    return servers[0]!.address;
                 } else {
-                    return servers[1].address;
+                    return servers[1]!.address;
                 }
             }
         );
@@ -431,7 +431,7 @@ describe("ConnectionManager", () => {
 
     before(async () => {
         for (let i = 0; i < addresses.length; i++) {
-            const addr = addresses[i];
+            const addr = addresses[i] as string;
             const server = new Server();
 
             if (i === 0) {

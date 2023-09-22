@@ -34,14 +34,15 @@ export function serve<T extends object>(
     }
 
     for (const name of Object.getOwnPropertyNames(_service)) {
-        const def: MethodDefinition<any, any> = _service[name];
+        const ins = instance as any;
+        const def = _service[name] as MethodDefinition<any, any>;
         let originalFn: (data?: any, metadata?: Metadata) => any = null as any;
         let newFn: (call: any, callback?: (err: unknown, result: any) => void) => void = null as any;
 
-        if (def.originalName && instance[def.originalName]) {
-            originalFn = (instance[def.originalName] as Function)?.bind(instance) as any;
+        if (def.originalName && ins[def.originalName]) {
+            originalFn = (ins[def.originalName] as Function)?.bind(instance) as any;
         } else {
-            originalFn = (instance[name] as Function)?.bind(instance) as any;
+            originalFn = (ins[name] as Function)?.bind(instance) as any;
         }
 
         if (!originalFn)
@@ -90,7 +91,7 @@ export function serve<T extends object>(
                 value: name,
             });
 
-            if (def.originalName && instance[def.originalName]) {
+            if (def.originalName && ins[def.originalName]) {
                 implementations[def.originalName] = newFn;
             } else {
                 implementations[name] = newFn;

@@ -7,7 +7,8 @@ import {
     ClientDuplexStream as gClientDuplexStream,
     ServiceClientConstructor,
     Metadata,
-    connectivityState
+    connectivityState,
+    MethodDefinition
 } from "@grpc/grpc-js";
 import { ServerReadableStream, ServerDuplexStream } from "./server";
 import { applyMagic } from "js-magic";
@@ -46,7 +47,7 @@ export type ServiceClient<T extends object> = Omit<Client, "waitForReady"> & {
 function captureCallStack() {
     const call: { stack?: string; } = {};
     Error.captureStackTrace(call, captureCallStack);
-    return call as { stack: string };
+    return call as { stack: string; };
 }
 
 function patchCallStack(err: unknown, trace: { stack: string; }) {
@@ -75,6 +76,7 @@ export function connect<T extends object>(
 
         if (callback) {
             _waitForReady(deadline as Date | number, callback);
+            return;
         } else {
             return new Promise<void>((resolve, reject) => {
                 _waitForReady(deadline as Date | number, (err: Error | void) => {
@@ -92,7 +94,7 @@ export function connect<T extends object>(
     });
 
     for (const name of Object.getOwnPropertyNames(service.service)) {
-        const def = service.service[name];
+        const def = service.service[name] as MethodDefinition<any, any>;
         const originalFn = ins[name]?.bind(ins);
         let newFn: (data?: any) => any = null as any;
 
@@ -133,6 +135,7 @@ export function connect<T extends object>(
                                 call.destroy();
                             });
 
+                            // @ts-ignore
                             return _end.apply(call, args);
                         };
                     }
@@ -170,6 +173,7 @@ export function connect<T extends object>(
                         });
                     }
 
+                    // @ts-ignore
                     call["returns"] = () => {
                         return new Promise<any>((resolve, reject) => {
                             if (!call.closed && !call.destroyed) {
@@ -358,7 +362,7 @@ export class LoadBalancer<T extends object, P extends any = any> {
                         return true;
                     }
                 });
-            address = addresses[this.acc++ % addresses.length];
+            address = addresses[this.acc++ % addresses.length] as string;
         }
 
         if (this.acc > Number.MAX_SAFE_INTEGER) {
@@ -378,11 +382,11 @@ export class LoadBalancer<T extends object, P extends any = any> {
                 throw new Error("The resolve server address is invalid");
             }
 
-            ins = connect(this.service, config.address, config.credentials, config.options);
-            this.instances[address] = ins;
+            ins = connect(this.service, config.address, config.credentials, config.options) as any;
+            this.instances[address] = ins as ServiceClient<T>;
         }
 
-        return ins;
+        return ins as ServiceClient<T>;
     }
 
     /** Closes all the connection. */
@@ -476,14 +480,14 @@ export class ConnectionManager {
         }
     }
 
-    private getServiceFullName(ctor: ServiceClientConstructor) {
+    private getServiceFullName(ctor: ServiceClientConstructor): string {
         const { service } = ctor;
-        const firstMethod = Object.getOwnPropertyNames(service)[0];
-        const { path } = service[firstMethod];
-        return path.split("/")[1];
+        const firstMethod = Object.getOwnPropertyNames(service)[0] as string;
+        const { path } = service[firstMethod] as MethodDefinition<any, any>;
+        return path.split("/")[1] as string;
     }
 
-    private unpackServiceFullName(target: string | ServiceClient<any> | LoadBalancer<any>) {
+    private unpackServiceFullName(target: string | ServiceClient<any> | LoadBalancer<any>): string {
         if (typeof target === "string") {
             return target;
         } else if (target instanceof LoadBalancer) {
@@ -537,6 +541,7 @@ class ChainingProxy {
 
     protected __get(prop: string | symbol) {
         if (prop in this) {
+            // @ts-ignore
             return this[prop];
         } else if (prop in this.__children) {
             return this.__children[String(prop)];
@@ -558,7 +563,7 @@ function createChainingProxy(target: string, manager: ConnectionManager) {
         const index = target.lastIndexOf(".");
         const serviceName = target.slice(0, index);
         const method = target.slice(index + 1);
-        const ins = manager.getInstanceOf(serviceName, data);
+        const ins = manager.getInstanceOf(serviceName, data) as any;
 
         if (typeof ins[method] === "function") {
             return ins[method](data);

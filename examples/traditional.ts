@@ -85,7 +85,7 @@ if (require.main?.filename === __filename) {
     // Calling #waitForReady() is required since at this point the server may not be
     // available yet.
     client.waitForReady(Date.now() + 5000, (_?: Error) => {
-        client.sayHello({ name: "World" } as Request, (err: Error, reply: Response) => {
+        client.sayHello!({ name: "World" } as Request, (err: Error, reply: Response) => {
             if (err) {
                 console.error(err);
             } else {
@@ -93,7 +93,7 @@ if (require.main?.filename === __filename) {
             }
         });
 
-        const streamReplyCall: ClientReadableStream<Response> = client.sayHelloStreamReply({
+        const streamReplyCall: ClientReadableStream<Response> = client.sayHelloStreamReply!({
             name: "World",
         } as Request);
         streamReplyCall.on("data", (reply: Response) => {
@@ -105,7 +105,7 @@ if (require.main?.filename === __filename) {
             console.error(err);
         });
 
-        const streamRequestCall: ClientWritableStream<Request> = client.sayHelloStreamRequest(
+        const streamRequestCall: ClientWritableStream<Request> = client.sayHelloStreamRequest!(
             (err: Error, reply: Response) => {
                 if (err) {
                     console.error(err);
@@ -122,7 +122,7 @@ if (require.main?.filename === __filename) {
         streamRequestCall.write({ name: "Mrs. World" } as Request);
         streamRequestCall.end();
 
-        const duplexCall: ClientDuplexStream<Request, Response> = client.sayHelloDuplex();
+        const duplexCall: ClientDuplexStream<Request, Response> = client.sayHelloDuplex!();
         duplexCall.on("data", (reply: Response) => {
             console.log(reply);
             // { message: "Hello, Mr. World" }
