@@ -28,10 +28,7 @@
         "compilerOptions": {
             "module": "commonjs",
             "target": "es2018",
-            "rootDir": "test/",
-            "noEmit": true,
-            "noUnusedParameters": true,
-            "noUnusedLocals": true
+            "rootDir": "test/"
         }
     }
 }

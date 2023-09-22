@@ -3,10 +3,10 @@
   "version": "0.1.1",
   "description": "A gRPC wrapper for Node.js with async functions",
   "exports": {
-      "types": "./index.ts",
-      "bun": "./index.ts",
-      "import": "./esm/index.js",
-      "require": "./cjs/index.js"
+    "types": "./index.ts",
+    "bun": "./index.ts",
+    "import": "./esm/index.js",
+    "require": "./cjs/index.js"
   },
   "scripts": {
     "protoc:go": "protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative examples/Greeter.proto",
@@ -31,8 +31,7 @@
   },
   "homepage": "https://github.com/ayonli/grpc-async#readme",
   "dependencies": {
-    "js-magic": "^1.4.2",
-    "tslib": "^2.6.2"
+    "js-magic": "^1.4.2"
   },
   "devDependencies": {
     "@ayonli/jsext": "^0.5.2",
@@ -42,6 +41,7 @@
     "@types/node": "^20.4.5",
     "mocha": "^10.2.0",
     "ts-node": "^10.9.1",
+    "tslib": "^2.6.2",
     "typescript": "^5.1.6"
   },
   "peerDependencies": {
