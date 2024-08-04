@@ -4,12 +4,12 @@
     "description": "A gRPC wrapper for Node.js with async functions",
     "main": "./cjs/index.js",
     "module": "./esm/index.js",
-    "types": "./cjs/index.ts",
+    "types": "./cjs/index.d.ts",
     "exports": {
         "bun": "./index.ts",
         "import": "./esm/index.js",
         "require": "./cjs/index.js",
-        "types": "./cjs/index.ts"
+        "types": "./cjs/index.d.ts"
     },
     "scripts": {
         "build": "tsc --module esnext --outDir esm && tsc --module commonjs --outDir cjs --declaration && node postbuild.js",
