@@ -1,54 +1,54 @@
 {
-  "name": "@ayonli/grpc-async",
-  "version": "0.1.1",
-  "description": "A gRPC wrapper for Node.js with async functions",
-  "exports": {
-    "types": "./index.ts",
-    "bun": "./index.ts",
-    "import": "./esm/index.js",
-    "require": "./cjs/index.js"
-  },
-  "scripts": {
-    "protoc:go": "protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative examples/Greeter.proto",
-    "build:esm": "tsc --module esnext --outDir esm -p tsconfig.json",
-    "build:cjs": "tsc --module commonjs --outDir cjs -p tsconfig.json",
-    "build": "npm run build:esm && npm run build:cjs",
-    "prepublishOnly": "npm run build",
-    "test": "mocha -r ts-node/register test/index.ts"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ayonli/grpc-async.git"
-  },
-  "keywords": [
-    "gRPC",
-    "async"
-  ],
-  "author": "A-yon Lee <the@ayon.li>",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/ayonli/grpc-async/issues"
-  },
-  "homepage": "https://github.com/ayonli/grpc-async#readme",
-  "dependencies": {
-    "js-magic": "^1.4.2"
-  },
-  "devDependencies": {
-    "@ayonli/jsext": "^0.5.2",
-    "@grpc/grpc-js": "^1.8.21",
-    "@grpc/proto-loader": "^0.7.8",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "^20.4.5",
-    "mocha": "^10.2.0",
-    "ts-node": "^10.9.1",
-    "tslib": "^2.6.2",
-    "typescript": "^5.1.6"
-  },
-  "peerDependencies": {
-    "@grpc/grpc-js": "^1.8.21",
-    "@grpc/proto-loader": "^0.7.8"
-  },
-  "engines": {
-    "node": ">=14"
-  }
+    "name": "@ayonli/grpc-async",
+    "version": "0.1.2",
+    "description": "A gRPC wrapper for Node.js with async functions",
+    "main": "./cjs/index.js",
+    "module": "./esm/index.js",
+    "types": "./cjs/index.ts",
+    "exports": {
+        "bun": "./index.ts",
+        "import": "./esm/index.js",
+        "require": "./cjs/index.js",
+        "types": "./cjs/index.ts"
+    },
+    "scripts": {
+        "build": "tsc --module esnext --outDir esm && tsc --module commonjs --outDir cjs --declaration && node postbuild.js",
+        "prepack": "npm run build",
+        "test": "mocha -r ts-node/register test/index.ts"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/ayonli/grpc-async.git"
+    },
+    "keywords": [
+        "gRPC",
+        "async"
+    ],
+    "author": "A-yon Lee <the@ayon.li>",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/ayonli/grpc-async/issues"
+    },
+    "homepage": "https://github.com/ayonli/grpc-async#readme",
+    "dependencies": {
+        "js-magic": "^1.4.2"
+    },
+    "devDependencies": {
+        "@ayonli/jsext": "^0.9.55",
+        "@grpc/grpc-js": "^1.8.21",
+        "@grpc/proto-loader": "^0.7.8",
+        "@types/mocha": "^10.0.1",
+        "@types/node": "^20.4.5",
+        "mocha": "^10.2.0",
+        "ts-node": "^10.9.1",
+        "tslib": "^2.6.2",
+        "typescript": "^5.1.6"
+    },
+    "peerDependencies": {
+        "@grpc/grpc-js": "^1.8.21",
+        "@grpc/proto-loader": "^0.7.8"
+    },
+    "engines": {
+        "node": ">=14"
+    }
 }

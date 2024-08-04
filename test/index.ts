@@ -14,7 +14,7 @@ import {
 } from "../index";
 import { SERVER_ADDRESS, examples, Request, Response } from "../examples/traditional";
 import { Greeter } from "../examples/async";
-import { _try } from "@ayonli/jsext";
+import _try from "@ayonli/jsext/try";
 
 describe("node-server <=> node-client", () => {
     let server: Server;
